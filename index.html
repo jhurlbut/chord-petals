@@ -954,22 +954,35 @@ function render(){
     el._basePos={x:px-pDiam/2,y:py-pDiam/2};
 
     // Build innerHTML only if content changed
+    // Build voicing rings as filled circles with progressively darker HSV value
     let ringsHTML='';
     if(voiceLevel>0){
       const half=pDiam/2;
+      // Parse the petal's solid color to HSL, then darken V by 5% per ring
+      const solidColor=qi.solid;
       ringsHTML=`<svg class="petal-rings" viewBox="0 0 ${pDiam} ${pDiam}" width="${pDiam}" height="${pDiam}">`;
-      // Filled circles in progressively darker shades of the petal color
       for(let r=1;r<=voiceLevel;r++){
         const rr=half-r*(half/(voiceLevel+1.5));
-        const darken=r*0.15; // 15% darker per ring
-        ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="rgba(0,0,0,${darken})" />`;
+        // Darken by reducing brightness: multiply RGB by (1 - r*0.05)
+        const factor=1-r*0.05;
+        // Parse hex or rgb
+        let fillColor=solidColor;
+        const hexMatch=solidColor.match(/#([0-9a-f]{6})/i);
+        if(hexMatch){
+          const R=Math.round(parseInt(hexMatch[1].slice(0,2),16)*factor);
+          const G=Math.round(parseInt(hexMatch[1].slice(2,4),16)*factor);
+          const B=Math.round(parseInt(hexMatch[1].slice(4,6),16)*factor);
+          fillColor=`rgb(${R},${G},${B})`;
+        }
+        ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="${fillColor}" />`;
       }
       ringsHTML+='</svg>';
     }
     const voiceTag=voiceLevel>0?` ${['','7th','9th','11th'][voiceLevel]}`:'';
     const noteCount=voiceLevel>0?[3,4,5,6][voiceLevel]+'♪':'';
     const fontSize=Math.max(9,Math.round(petalR*0.38*petalScale));
-    const newHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px">${showNames?ch.name+voiceTag:noteCount}</span>`;
+    // Text rendered after SVG so it sits on top
+    const newHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px;position:relative;z-index:2">${showNames?ch.name+voiceTag:noteCount}</span>`;
     if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
 
     // Attach event handlers only once
