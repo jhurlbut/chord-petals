@@ -657,15 +657,34 @@ function showKeyPopup(){
   popup.classList.add('show');
 }
 
-// Tap scale name to cycle: major → minor → diminished → lydian
-document.getElementById('centerSub').addEventListener('click',(e)=>{
-  e.stopPropagation();
+// Swipe up/down on center to change scale
+let centerTouchStartY=null;
+document.getElementById('center').addEventListener('touchstart',(e)=>{
+  centerTouchStartY=e.touches[0].clientY;
+},{passive:true});
+document.getElementById('center').addEventListener('touchend',(e)=>{
+  if(centerTouchStartY===null)return;
+  const dy=e.changedTouches[0].clientY-centerTouchStartY;
+  centerTouchStartY=null;
+  if(Math.abs(dy)<20)return; // too small, treat as tap
+  e.preventDefault();e.stopPropagation();
   const idx=SCALE_TYPES.indexOf(currentScale);
-  currentScale=SCALE_TYPES[(idx+1)%SCALE_TYPES.length];
+  if(dy<0){// swipe up = next
+    currentScale=SCALE_TYPES[(idx+1)%SCALE_TYPES.length];
+  }else{// swipe down = prev
+    currentScale=SCALE_TYPES[(idx-1+SCALE_TYPES.length)%SCALE_TYPES.length];
+  }
   petalCustomOffsets={};selectedPetal=-1;
   render();
 });
-document.getElementById('centerSub').style.cursor='pointer';
+// Mouse wheel on center also changes scale (desktop)
+document.getElementById('center').addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  const idx=SCALE_TYPES.indexOf(currentScale);
+  currentScale=SCALE_TYPES[(idx+(e.deltaY>0?1:-1)+SCALE_TYPES.length)%SCALE_TYPES.length];
+  petalCustomOffsets={};selectedPetal=-1;
+  render();
+},{passive:false});
 
 // Center click — play chord only
 document.getElementById('center').addEventListener('click',(e)=>{
