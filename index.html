@@ -835,14 +835,18 @@ function render(){
   // For n petals packed in a circle of radius R: R ≈ c*√n, area per seed ≈ π*c²
   // We want area per seed ≈ π*(petalR*1.1)² → c ≈ petalR*1.1
   const goldenAngle=137.508*Math.PI/180; // ~2.39996 radians
-  const spiralC=petalR*1.35; // spacing constant tuned for non-overlapping petals
-  const spiralStart=centerR+petalR+Math.round(4*scale); // min radius: clear the center circle
+  // Vogel's model: r(k) = c * √k, θ(k) = k * 137.5°
+  // To avoid overlap, area per petal ≈ π*c² must fit a circle of diameter 2*petalR
+  // So c ≈ 2*petalR / √(π) ≈ petalR * 1.13, but we add padding
+  const petalDiam=petalR*2;
+  const spiralC=petalDiam*0.95; // packing constant
+  const minR=centerR+petalR+Math.round(6*scale); // must clear center
   
   // Compute spiral positions for each petal
   const spiralPositions=[];
   for(let k=0;k<chords.length;k++){
-    const r=spiralStart+spiralC*Math.sqrt(k); // k=0 → first petal at spiralStart
-    const theta=k*goldenAngle+(globalRotation*Math.PI/180);
+    const r=Math.max(minR, spiralC*Math.sqrt(k+1));
+    const theta=(k+1)*goldenAngle+(globalRotation*Math.PI/180);
     spiralPositions.push({r,theta});
   }
   
