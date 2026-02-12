@@ -451,50 +451,7 @@ function resumeAudioCtx(){
   document.addEventListener(evt,resumeAudioCtx,{passive:true});
 });
 
-// Mute indicator
-let muteToastEl=null;
-function showMuteToast(){
-  if(muteToastEl)return;
-  muteToastEl=document.createElement('div');
-  muteToastEl.id='muteToast';
-  muteToastEl.innerHTML='🔇 Silent mode — unmute your phone or connect headphones to hear chords';
-  muteToastEl.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#f0c928;font-size:12px;padding:8px 16px;border-radius:20px;z-index:9999;text-align:center;max-width:90%;backdrop-filter:blur(8px);border:1px solid rgba(240,201,40,0.3);transition:opacity 0.3s;pointer-events:auto;cursor:pointer';
-  muteToastEl.onclick=()=>dismissMuteToast();
-  document.body.appendChild(muteToastEl);
-}
-function dismissMuteToast(){
-  if(muteToastEl){muteToastEl.style.opacity='0';setTimeout(()=>{muteToastEl?.remove();muteToastEl=null;},300);}
-}
-// Check if audio is actually playing (detects iOS silent switch)
-let muteCheckDone=false;
-function checkMuteState(){
-  if(muteCheckDone||!audioCtx)return;
-  const ctx=audioCtx;
-  if(ctx.state==='suspended')return;
-  const osc=ctx.createOscillator();
-  const analyser=ctx.createAnalyser();
-  const gain=ctx.createGain();
-  gain.gain.value=0.001; // inaudible
-  osc.connect(gain).connect(analyser).connect(ctx.destination);
-  osc.frequency.value=200;
-  analyser.fftSize=256;
-  osc.start();
-  setTimeout(()=>{
-    const data=new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(data);
-    const sum=data.reduce((a,b)=>a+b,0);
-    osc.stop();
-    osc.disconnect();
-    if(sum===0&&/iPhone|iPad|iPod/.test(navigator.userAgent)){
-      showMuteToast();
-    }else{
-      dismissMuteToast();
-    }
-    muteCheckDone=true;
-    // Re-check on next interaction
-    setTimeout(()=>{muteCheckDone=false;},5000);
-  },100);
-}
+function checkMuteState(){} // removed - was causing UI issues
 
 // Apply voicing mode to intervals
 function applyVoicing(intervals){
