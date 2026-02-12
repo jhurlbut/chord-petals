@@ -839,21 +839,18 @@ function render(){
   // To avoid overlap, area per petal ≈ π*c² must fit a circle of diameter 2*petalR
   // So c ≈ 2*petalR / √(π) ≈ petalR * 1.13, but we add padding
   const petalDiam=petalR*2;
-  const minR=centerR+petalR+Math.round(8*scale); // must clear center
-  // Vogel: r = c√n. We want petals touching but not overlapping.
-  // Pack density: each petal occupies ~(2*petalR)² area in the spiral.
-  // c = petalDiam / √(π) ≈ petalDiam * 0.56, but we need padding.
-  // Empirically: c = petalDiam * 0.75 works well for 7-20 petals.
-  const spiralC=petalDiam*0.75;
+  const minR=centerR+petalR+Math.round(10*scale); // first petal clears center
+  // Sunflower phyllotaxis: θ = k × golden_angle, r = c × √k
+  // For small petal counts (<20), boost the spacing constant so petals
+  // don't bunch near center. kOffset shifts the √k curve outward.
+  const spiralC=petalDiam*1.0; // generous spacing
+  const kOffset=Math.pow(minR/spiralC,2); // ensures r(0) = minR
   
   // Compute spiral positions for each petal
   const spiralPositions=[];
   for(let k=0;k<chords.length;k++){
-    // Shift index so first petal starts at minR distance
-    // Solve: minR = c * √(k_offset) → k_offset = (minR/c)²
-    const kOffset=Math.pow(minR/spiralC,2);
     const r=spiralC*Math.sqrt(k+kOffset);
-    const theta=(k+1)*goldenAngle+(globalRotation*Math.PI/180);
+    const theta=k*goldenAngle+(globalRotation*Math.PI/180);
     spiralPositions.push({r,theta});
   }
   
