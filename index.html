@@ -830,15 +830,19 @@ function render(){
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
   // Sunflower spiral layout (Vogel's model)
-  // r(k) = c * sqrt(k), θ(k) = k * golden_angle
+  // r(k) = c * sqrt(k), θ(k) = k * golden_angle (137.508°)
+  // c chosen so petals don't overlap: adjacent seeds need ~petalDiam spacing
+  // For n petals packed in a circle of radius R: R ≈ c*√n, area per seed ≈ π*c²
+  // We want area per seed ≈ π*(petalR*1.1)² → c ≈ petalR*1.1
   const goldenAngle=137.508*Math.PI/180; // ~2.39996 radians
-  const spiralC=(centerR+petalR*0.6); // spacing constant — first petal just outside center
+  const spiralC=petalR*1.35; // spacing constant tuned for non-overlapping petals
+  const spiralStart=centerR+petalR+Math.round(4*scale); // min radius: clear the center circle
   
   // Compute spiral positions for each petal
   const spiralPositions=[];
   for(let k=0;k<chords.length;k++){
-    const r=spiralC*Math.sqrt(k+1); // k+1 so first petal isn't at center
-    const theta=(k+1)*goldenAngle+(globalRotation*Math.PI/180);
+    const r=spiralStart+spiralC*Math.sqrt(k); // k=0 → first petal at spiralStart
+    const theta=k*goldenAngle+(globalRotation*Math.PI/180);
     spiralPositions.push({r,theta});
   }
   
