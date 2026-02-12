@@ -986,7 +986,9 @@ function render(){
         longPressT=setTimeout(()=>{
           const cur=petalVoicings[idx]||0;
           petalVoicings[idx]=(cur+1)%4;
-          el._wasDragged=true;
+          el._wasDragged=true; // suppress click after long-press
+          // Reset _wasDragged after click event would have fired
+          setTimeout(()=>{el._wasDragged=false;},300);
           render();
           const vl2=petalVoicings[idx];
           const ext2=VOICING_EXTENSIONS[c.quality];
