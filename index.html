@@ -68,6 +68,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 /* ── Flower Garden ── */
 .garden{
   position:relative;width:100%;flex:1;min-height:0;overflow:hidden;
+  contain:layout style;touch-action:manipulation;
 }
 
 /* Outer rotation ring */
@@ -104,9 +105,9 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   position:absolute;width:56px;height:56px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;z-index:5;
-  transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1),
-             transform .15s,box-shadow .2s,width .15s,height .15s;
-  transform:translate(-50%,-50%);
+  transition:transform .45s cubic-bezier(.4,0,.2,1),box-shadow .2s,width .15s,height .15s;
+  will-change:transform;
+  touch-action:manipulation;
 }
 .petal.entering{opacity:0;transform:translate(-50%,-50%) scale(0.3)}
 .petal .petal-label{
@@ -462,8 +463,13 @@ function resumeAudioCtx(){
     }
   }
 }
-['touchstart','touchend','click','pointerdown','pointerup'].forEach(evt=>{
-  document.addEventListener(evt,resumeAudioCtx,{passive:true});
+// Pre-create AudioContext on first user gesture
+function ensureAudioReady(e){
+  getAudio();
+  resumeAudioCtx();
+}
+['touchstart','pointerdown'].forEach(evt=>{
+  document.addEventListener(evt,ensureAudioReady,{passive:true,once:false});
 });
 
 function checkMuteState(){} // removed - was causing UI issues
@@ -572,83 +578,9 @@ function playChord(rootNote,quality){
   playChordNotes(rootNote,intervals);
 }
 
-function _playChord_UNUSED(rootNote,quality){
-  if(!soundOn)return;
-  checkMuteState();
-  const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
-  const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
-  const intervals=QUALITY[quality]?.intervals||[0,4,7];
-  const now=ctx.currentTime;
-  activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
-  activeVoices=[];
-  const noteGain=0.12/intervals.length;
-  const attack=0.02,decay=0.15,sustain=0.6,release=1.0,total=1.8;
-  intervals.forEach((semi)=>{
-    const freq=baseFreq*Math.pow(2,semi/12);
-    const vGain=ctx.createGain();
-    vGain.gain.setValueAtTime(0.001,now);
-    vGain.gain.linearRampToValueAtTime(noteGain,now+attack);
-    vGain.gain.linearRampToValueAtTime(noteGain*sustain,now+attack+decay);
-    vGain.gain.setValueAtTime(noteGain*sustain,now+total-release);
-    vGain.gain.exponentialRampToValueAtTime(0.001,now+total);
-    const filter=ctx.createBiquadFilter();filter.type='lowpass';
-    filter.frequency.setValueAtTime(2200,now);filter.frequency.exponentialRampToValueAtTime(800,now+total*0.7);filter.Q.value=1.5;
-    const saw1=ctx.createOscillator();saw1.type='sawtooth';saw1.frequency.value=freq;
-    const saw2=ctx.createOscillator();saw2.type='sawtooth';saw2.frequency.value=freq*1.005;
-    const saw3=ctx.createOscillator();saw3.type='sawtooth';saw3.frequency.value=freq*0.995;
-    const sub=ctx.createOscillator();sub.type='triangle';sub.frequency.value=freq/2;
-    const subGain=ctx.createGain();subGain.gain.value=0.3;
-    const m1=ctx.createGain();m1.gain.value=0.4;
-    const m2=ctx.createGain();m2.gain.value=0.3;
-    const m3=ctx.createGain();m3.gain.value=0.3;
-    saw1.connect(m1);saw2.connect(m2);saw3.connect(m3);sub.connect(subGain);
-    m1.connect(filter);m2.connect(filter);m3.connect(filter);subGain.connect(filter);
-    filter.connect(vGain);vGain.connect(masterGain);
-    saw1.start(now);saw1.stop(now+total+0.1);
-    saw2.start(now);saw2.stop(now+total+0.1);
-    saw3.start(now);saw3.stop(now+total+0.1);
-    sub.start(now);sub.stop(now+total+0.1);
-    activeVoices.push({gain:vGain,stop:(t)=>{[saw1,saw2,saw3,sub].forEach(o=>{try{o.stop(t)}catch(e){}})}});
-  });
-}
-
 // Play chord with explicit interval array
 function playChordIntervals(rootNote,intervals){
   playChordNotes(rootNote,intervals);
-}
-
-function _playChordIntervals_UNUSED(rootNote,intervals){
-  if(!soundOn)return;
-  const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
-  const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
-  const now=ctx.currentTime;
-  activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
-  activeVoices=[];
-  const noteGain=0.12/intervals.length;
-  const attack=0.02,decay=0.15,sustain=0.6,release=1.0,total=1.8;
-  intervals.forEach((semi)=>{
-    const freq=baseFreq*Math.pow(2,semi/12);
-    const vGain=ctx.createGain();
-    vGain.gain.setValueAtTime(0.001,now);
-    vGain.gain.linearRampToValueAtTime(noteGain,now+attack);
-    vGain.gain.linearRampToValueAtTime(noteGain*sustain,now+attack+decay);
-    vGain.gain.setValueAtTime(noteGain*sustain,now+total-release);
-    vGain.gain.exponentialRampToValueAtTime(0.001,now+total);
-    const filter=ctx.createBiquadFilter();filter.type='lowpass';
-    filter.frequency.setValueAtTime(2200,now);filter.frequency.exponentialRampToValueAtTime(800,now+total*0.7);filter.Q.value=1.5;
-    const saw1=ctx.createOscillator();saw1.type='sawtooth';saw1.frequency.value=freq;
-    const saw2=ctx.createOscillator();saw2.type='sawtooth';saw2.frequency.value=freq*1.005;
-    const saw3=ctx.createOscillator();saw3.type='sawtooth';saw3.frequency.value=freq*0.995;
-    const sub=ctx.createOscillator();sub.type='triangle';sub.frequency.value=freq/2;
-    const subGain=ctx.createGain();subGain.gain.value=0.3;
-    const m1=ctx.createGain();m1.gain.value=0.4;const m2=ctx.createGain();m2.gain.value=0.3;const m3=ctx.createGain();m3.gain.value=0.3;
-    saw1.connect(m1);saw2.connect(m2);saw3.connect(m3);sub.connect(subGain);
-    m1.connect(filter);m2.connect(filter);m3.connect(filter);subGain.connect(filter);
-    filter.connect(vGain);vGain.connect(masterGain);
-    saw1.start(now);saw1.stop(now+total+0.1);saw2.start(now);saw2.stop(now+total+0.1);
-    saw3.start(now);saw3.stop(now+total+0.1);sub.start(now);sub.stop(now+total+0.1);
-    activeVoices.push({gain:vGain,stop:(t)=>{[saw1,saw2,saw3,sub].forEach(o=>{try{o.stop(t)}catch(e){}})}});
-  });
 }
 
 // ═══════════════════════════════════════════
@@ -671,12 +603,12 @@ let phraseMode='block';  // block, strum, arpeggio
 let octaveShift=0;       // -2 to +2 octaves
 let synthPreset='warm';  // warm, bright, pad, keys, pluck, organ
 const SYNTH_PRESETS={
-  warm:{osc:'sawtooth',detune:0.005,sub:true,subVol:0.3,filterStart:2200,filterEnd:800,filterQ:1.5,attack:0.02,decay:0.15,sustain:0.6,release:1.0,total:1.8},
-  bright:{osc:'sawtooth',detune:0.008,sub:false,subVol:0,filterStart:6000,filterEnd:2000,filterQ:2.0,attack:0.01,decay:0.1,sustain:0.7,release:0.8,total:1.5},
-  pad:{osc:'sine',detune:0.003,sub:true,subVol:0.5,filterStart:1500,filterEnd:600,filterQ:0.8,attack:0.3,decay:0.4,sustain:0.8,release:1.5,total:3.0},
-  keys:{osc:'triangle',detune:0.002,sub:false,subVol:0,filterStart:4000,filterEnd:500,filterQ:1.0,attack:0.005,decay:0.3,sustain:0.3,release:0.5,total:1.2},
-  pluck:{osc:'sawtooth',detune:0.01,sub:false,subVol:0,filterStart:8000,filterEnd:300,filterQ:3.0,attack:0.002,decay:0.05,sustain:0.1,release:0.3,total:0.6},
-  organ:{osc:'sine',detune:0,sub:true,subVol:0.6,filterStart:3000,filterEnd:2800,filterQ:0.5,attack:0.01,decay:0.05,sustain:0.9,release:0.2,total:2.0},
+  warm:{osc:'sawtooth',detune:0.005,sub:true,subVol:0.3,filterStart:2200,filterEnd:800,filterQ:1.5,attack:0.005,decay:0.12,sustain:0.6,release:1.0,total:1.8},
+  bright:{osc:'sawtooth',detune:0.008,sub:false,subVol:0,filterStart:6000,filterEnd:2000,filterQ:2.0,attack:0.003,decay:0.08,sustain:0.7,release:0.8,total:1.5},
+  pad:{osc:'sine',detune:0.003,sub:true,subVol:0.5,filterStart:1500,filterEnd:600,filterQ:0.8,attack:0.15,decay:0.3,sustain:0.8,release:1.5,total:3.0},
+  keys:{osc:'triangle',detune:0.002,sub:false,subVol:0,filterStart:4000,filterEnd:500,filterQ:1.0,attack:0.002,decay:0.25,sustain:0.3,release:0.5,total:1.2},
+  pluck:{osc:'sawtooth',detune:0.01,sub:false,subVol:0,filterStart:8000,filterEnd:300,filterQ:3.0,attack:0.001,decay:0.04,sustain:0.1,release:0.3,total:0.6},
+  organ:{osc:'sine',detune:0,sub:true,subVol:0.6,filterStart:3000,filterEnd:2800,filterQ:0.5,attack:0.003,decay:0.04,sustain:0.9,release:0.2,total:2.0},
 };
 const VOICING_MODES=['close','open','spread'];
 const PHRASE_MODES=['block','strum','arpeggio'];
@@ -685,6 +617,9 @@ let globalRotation=0; // degrees offset from dragging outer ring
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
+// Cached garden dimensions
+let _gardenW=360,_gardenH=360;
+function cacheGardenDims(){const g=document.getElementById('garden');_gardenW=g.clientWidth||360;_gardenH=g.clientHeight||360;}
 
 function init(){
   const bar=document.getElementById('modeBar');
@@ -801,7 +736,7 @@ document.getElementById('center').addEventListener('wheel',(e)=>{
   const idx=SCALE_TYPES.indexOf(currentScale);
   currentScale=SCALE_TYPES[(idx+(e.deltaY>0?1:-1)+SCALE_TYPES.length)%SCALE_TYPES.length];
   petalCustomOffsets={};selectedPetal=-1;
-  render();
+  cacheGardenDims();render();
 },{passive:false});
 
 // Center click — play chord only
@@ -840,138 +775,136 @@ document.getElementById('garden').addEventListener('click',gardenEmptyTap);
 function render(){
   const mode=MODES.find(m=>m.id===currentMode);
   let allChords=mode.fn(currentRoot);
-  // If petalCount exceeds mode's chords, pad with chromatic neighbors
   while(allChords.length<petalCount){
     const next=(currentRoot+allChords.length)%12;
-    allChords.push(chord(next,'major','+')); 
+    allChords.push(chord(next,'major','+'));
   }
   const chords=allChords.slice(0,petalCount);
   const rootName=noteName(currentRoot,true);
 
   document.getElementById('centerName').textContent=rootName;
   document.getElementById('centerSub').textContent=currentScale;
-
   document.getElementById('undoBtn').disabled=history_stack.length<=1;
   document.getElementById('redoBtn').disabled=redoStack.length===0;
 
-  // Render petals
   const garden=document.getElementById('garden');
-  const gw=garden.clientWidth||360;
-  const gh=garden.clientHeight||360;
+  const gw=_gardenW,gh=_gardenH;
   const cx=gw/2, cy=gh/2;
-
-  // Scale petals to garden size
   const scale=Math.min(gw,gh)/300;
   const centerR=Math.round(48*scale), petalR=Math.round(36*scale);
 
-  // Scale center circle
   const cEl=document.getElementById('center');
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
-  const orbitR=centerR+petalR-Math.round(12*scale); // tight overlap
+  const orbitR=centerR+petalR-Math.round(12*scale);
 
-  // Rotation ring
   const ring=document.getElementById('rotRing');
   const ringR=orbitR+petalR+14;
   ring.style.width=ring.style.height=(ringR*2)+'px';
   ring.style.left=(cx-ringR)+'px';ring.style.top=(cy-ringR)+'px';
 
-  // Delete ring (same size as rotation ring)
   const delRing=document.getElementById('deleteRing');
   delRing.style.width=delRing.style.height=(ringR*2)+'px';
   delRing.style.left=(cx-ringR)+'px';delRing.style.top=(cy-ringR)+'px';
 
-  // Remove old petals
-  petalElements.forEach(el=>el.remove());
-  petalElements=[];
+  // DOM recycling: reuse existing petal elements
+  const needed=chords.length;
+  // Remove excess
+  while(petalElements.length>needed){
+    const el=petalElements.pop();el.remove();
+  }
+  // Add missing
+  while(petalElements.length<needed){
+    const el=document.createElement('div');
+    el.className='petal';
+    el.style.boxShadow='none';
+    garden.appendChild(el);
+    petalElements.push(el);
+  }
 
+  const pDiam=petalR*2;
   chords.forEach((ch,i)=>{
     const angle=(2*Math.PI*i/chords.length)-Math.PI/2+(globalRotation*Math.PI/180);
     const custom=petalCustomOffsets[i];
     const px=custom?cx+custom.dx:cx+orbitR*Math.cos(angle);
     const py=custom?cy+custom.dy:cy+orbitR*Math.sin(angle);
     const qi=QUALITY[ch.quality]||QUALITY.major;
-
     const voiceLevel=petalVoicings[i]||0;
-    const el=document.createElement('div');
-    el.className='petal';
-    el.style.left=px+'px';el.style.top=py+'px';
-    el.style.width=(petalR*2)+'px';el.style.height=(petalR*2)+'px';
-    el.style.background=qi.solid;
-    el.style.boxShadow='none';
-    if(i===selectedPetal)el.classList.add('selected');
 
-    // Build concentric rings SVG overlay
+    const el=petalElements[i];
+    // Use transform for GPU-accelerated positioning
+    el.style.transform=`translate(${px-petalR}px,${py-petalR}px)`;
+    el.style.width=pDiam+'px';el.style.height=pDiam+'px';
+    el.style.left='0';el.style.top='0';
+    el.style.background=qi.solid;
+    el.classList.toggle('selected',i===selectedPetal);
+    el.dataset.index=i;
+    // Store chord data for event handlers
+    el._chordData={ch,i,voiceLevel};
+
+    // Build innerHTML only if content changed
     let ringsHTML='';
-    const pDiam=petalR*2;
     if(voiceLevel>0){
       ringsHTML=`<svg class="petal-rings" viewBox="0 0 ${pDiam} ${pDiam}" width="${pDiam}" height="${pDiam}">`;
       for(let r=1;r<=voiceLevel;r++){
-        const ringR=petalR-r*(petalR/5);
-        ringsHTML+=`<circle cx="${petalR}" cy="${petalR}" r="${ringR}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>`;
+        const rr=petalR-r*(petalR/5);
+        ringsHTML+=`<circle cx="${petalR}" cy="${petalR}" r="${rr}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>`;
       }
       ringsHTML+='</svg>';
     }
-    // Voicing label suffix
-    const vLabel=VOICING_LABELS[voiceLevel]||'';
-    const displayName=showNames?(ch.name.replace(/(m7|7|maj7|ø7)$/,'')+vLabel|| ch.name):'';
     const voiceTag=voiceLevel>0?` ${['','7th','9th','11th'][voiceLevel]}`:'';
     const noteCount=voiceLevel>0?[3,4,5,6][voiceLevel]+'♪':'';
     const fontSize=Math.max(11,Math.round(petalR*0.38));
-    el.innerHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px">${showNames?ch.name+voiceTag:noteCount}</span>`;
-    el.dataset.index=i;
+    const newHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px">${showNames?ch.name+voiceTag:noteCount}</span>`;
+    if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
 
-    // Click
-    el.addEventListener('click',(e)=>{
-      if(el._wasDragged)return;
-      e.stopPropagation();
-      selectedPetal=i===selectedPetal?-1:i;
-      // Use voicing-extended intervals
-      const vl=petalVoicings[i]||0;
-      const ext=VOICING_EXTENSIONS[ch.quality];
-      if(ext&&ext[vl]){
-        playChordIntervals(ch.root,ext[vl]);
-      }else{
-        playChord(ch.root,ch.quality);
-      }
-      sendMIDIChord(ch.root,ch.quality);
-      // Spring animation
-      el.style.transition='transform 0.1s ease-out';
-      el.style.transform='translate(-50%,-50%) scale(0.88)';
-      setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform='translate(-50%,-50%) scale(1.06)';},100);
-      setTimeout(()=>{el.style.transition='transform 0.25s cubic-bezier(0.34,1.2,0.64,1)';el.style.transform='translate(-50%,-50%) scale(0.97)';},350);
-      setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform='translate(-50%,-50%)';render();},550);
-    });
+    // Attach event handlers only once
+    if(!el._eventsAttached){
+      el._eventsAttached=true;
+      el.addEventListener('click',(e)=>{
+        if(el._wasDragged)return;
+        e.stopPropagation();
+        const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
+        selectedPetal=idx===selectedPetal?-1:idx;
+        // Send MIDI immediately (don't wait for audio)
+        sendMIDIChord(c.root,c.quality);
+        const ext=VOICING_EXTENSIONS[c.quality];
+        if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
+        else playChord(c.root,c.quality);
+        // Spring animation via rAF
+        const baseT=`translate(${parseFloat(el.style.transform.match(/translate\(([^,]+)/)?.[1]||0)}px,${parseFloat(el.style.transform.match(/,\s*([^)]+)/)?.[1]||0)}px)`;
+        el.style.transition='transform 0.1s ease-out';
+        el.style.transform=baseT+' scale(0.88)';
+        setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT+' scale(1.06)';},100);
+        setTimeout(()=>{el.style.transition='transform 0.25s cubic-bezier(0.34,1.2,0.64,1)';el.style.transform=baseT+' scale(0.97)';},350);
+        setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform=baseT;render();},550);
+      });
 
-    // Double-tap to navigate, long-press to cycle voicing
-    let tapC=0,tapT,longPressT;
-    el.addEventListener('pointerdown',(ev)=>{
-      tapC++;
-      if(tapC===2){
-        clearTimeout(tapT);tapC=0;
-        if(!lockRoot){setRoot(ch.root,ch.name);}
-        else{delete petalCustomOffsets[i];render();}
-        return;
-      }
-      tapT=setTimeout(()=>tapC=0,350);
-      // Long press: cycle voicing rings
-      longPressT=setTimeout(()=>{
-        const cur=petalVoicings[i]||0;
-        petalVoicings[i]=(cur+1)%4;
-        el._wasDragged=true; // prevent click from firing
-        render();
-        // Play the new voicing
-        const vl2=petalVoicings[i];
-        const ext2=VOICING_EXTENSIONS[ch.quality];
-        if(ext2&&ext2[vl2])playChordIntervals(ch.root,ext2[vl2]);
-      },500);
-    });
-    el.addEventListener('pointerup',()=>clearTimeout(longPressT));
-    el.addEventListener('pointermove',()=>clearTimeout(longPressT));
-
-    garden.appendChild(el);
-    petalElements.push(el);
+      let tapC=0,tapT,longPressT;
+      el.addEventListener('pointerdown',(ev)=>{
+        const{ch:c,i:idx}=el._chordData;
+        tapC++;
+        if(tapC===2){
+          clearTimeout(tapT);tapC=0;
+          if(!lockRoot)setRoot(c.root,c.name);
+          else{delete petalCustomOffsets[idx];render();}
+          return;
+        }
+        tapT=setTimeout(()=>tapC=0,350);
+        longPressT=setTimeout(()=>{
+          const cur=petalVoicings[idx]||0;
+          petalVoicings[idx]=(cur+1)%4;
+          el._wasDragged=true;
+          render();
+          const vl2=petalVoicings[idx];
+          const ext2=VOICING_EXTENSIONS[c.quality];
+          if(ext2&&ext2[vl2])playChordIntervals(c.root,ext2[vl2]);
+        },500);
+      });
+      el.addEventListener('pointerup',()=>clearTimeout(longPressT));
+      el.addEventListener('pointermove',()=>clearTimeout(longPressT));
+    }
   });
 
   // History
@@ -1028,9 +961,10 @@ function initDragSystem(){
       if(Math.abs(dx)+Math.abs(dy)>5)dragTarget._wasDragged=true;
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
-      const rect=gardenRect();
+      const rect=r;
       const lx=p.x-rect.left,ly=p.y-rect.top;
-      dragTarget.style.left=lx+'px';dragTarget.style.top=ly+'px';
+      const petalR=parseFloat(dragTarget.style.width)/2;
+      dragTarget.style.transform=`translate(${lx-petalR}px,${ly-petalR}px)`;
       dragTarget.style.transition='width .1s,height .1s,box-shadow .1s';
       const idx=parseInt(dragTarget.dataset.index);
       petalCustomOffsets[idx]={dx:lx-cx,dy:ly-cy};
@@ -1213,18 +1147,24 @@ function detectChordFromMIDI(){
 }
 
 initMIDI();
+// Debounced resize handler
+let _resizeRAF=0;
+function onResize(){
+  if(_resizeRAF)cancelAnimationFrame(_resizeRAF);
+  _resizeRAF=requestAnimationFrame(()=>{cacheGardenDims();render();_resizeRAF=0;});
+}
 // Wait for layout to complete before first render
 requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  cacheGardenDims();
   init();
-  window.addEventListener('resize',()=>render());
+  window.addEventListener('resize',onResize,{passive:true});
 }));
 
 // Wire up +/- buttons with addEventListener (onclick can fail on iOS)
-document.getElementById('addBtn').addEventListener('touchend',(e)=>{e.preventDefault();e.stopPropagation();addPetal();});
+document.getElementById('addBtn').addEventListener('touchend',(e)=>{e.preventDefault();e.stopPropagation();addPetal();},{passive:false});
 document.getElementById('addBtn').addEventListener('click',(e)=>{e.stopPropagation();addPetal();});
-document.getElementById('removeBtn').addEventListener('touchend',(e)=>{e.preventDefault();e.stopPropagation();removePetal();});
+document.getElementById('removeBtn').addEventListener('touchend',(e)=>{e.preventDefault();e.stopPropagation();removePetal();},{passive:false});
 document.getElementById('removeBtn').addEventListener('click',(e)=>{e.stopPropagation();removePetal();});
-window.addEventListener('resize',()=>render());
 </script>
 </body>
 </html>
