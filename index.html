@@ -256,6 +256,12 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-voice="open" onclick="setVoiceMode('open')">Open</button>
     <button class="voice-opt" data-voice="spread" onclick="setVoiceMode('spread')">Spread</button>
   </div>
+  <label>Octave</label>
+  <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center">
+    <button class="voice-opt" onclick="shiftOctave(-1)" style="flex:0 0 48px">▼</button>
+    <span id="octaveLabel" style="flex:1;text-align:center;color:var(--text);font-size:13px">0</span>
+    <button class="voice-opt" onclick="shiftOctave(1)" style="flex:0 0 48px">▲</button>
+  </div>
   <label>Phrasing</label>
   <div style="display:flex;gap:4px">
     <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
@@ -498,7 +504,7 @@ function playChordNotes(rootNote,intervals){
   if(!soundOn)return;
   checkMuteState();
   const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
-  const baseFreq=261.63*Math.pow(2,rootNote/12);
+  const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
   const voiced=applyVoicing(intervals);
   const now=ctx.currentTime;
   activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
@@ -544,7 +550,7 @@ function _playChord_UNUSED(rootNote,quality){
   if(!soundOn)return;
   checkMuteState();
   const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
-  const baseFreq=261.63*Math.pow(2,rootNote/12);
+  const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
   const intervals=QUALITY[quality]?.intervals||[0,4,7];
   const now=ctx.currentTime;
   activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
@@ -588,7 +594,7 @@ function playChordIntervals(rootNote,intervals){
 function _playChordIntervals_UNUSED(rootNote,intervals){
   if(!soundOn)return;
   const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
-  const baseFreq=261.63*Math.pow(2,rootNote/12);
+  const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
   const now=ctx.currentTime;
   activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
   activeVoices=[];
@@ -636,6 +642,7 @@ let lockRoot=false;
 let bassRoot=false;      // play root in bass octave
 let voicingMode='close'; // close, open, spread
 let phraseMode='block';  // block, strum, arpeggio
+let octaveShift=0;       // -2 to +2 octaves
 const VOICING_MODES=['close','open','spread'];
 const PHRASE_MODES=['block','strum','arpeggio'];
 let petalCount=5; // default visible petals
@@ -1048,6 +1055,10 @@ function toggleVoicePanel(){
   document.getElementById('midiPanel').classList.remove('open');
 }
 function toggleBass(v){bassRoot=v;}
+function shiftOctave(dir){
+  octaveShift=Math.max(-2,Math.min(2,octaveShift+dir));
+  document.getElementById('octaveLabel').textContent=(octaveShift>0?'+':'')+octaveShift;
+}
 function setVoiceMode(m){
   voicingMode=m;
   document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
