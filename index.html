@@ -288,9 +288,9 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <span onclick="document.getElementById('debugPanel').style.display='none'" style="cursor:pointer;font-size:18px;">✕</span>
   </div>
   <label>spiralC multiplier: <span id="dbgCVal">1.00</span></label>
-  <input type="range" id="dbgC" min="0.3" max="2.0" step="0.05" value="1.00" style="width:100%" oninput="dbgSpiralC=+this.value;document.getElementById('dbgCVal').textContent=this.value;render()">
+  <input type="range" id="dbgC" min="0.2" max="0.8" step="0.01" value="0.30" style="width:100%" oninput="dbgSpiralC=+this.value;document.getElementById('dbgCVal').textContent=this.value;render()">
   <label>kOffset override: <span id="dbgKVal">auto</span></label>
-  <input type="range" id="dbgK" min="0" max="10" step="0.1" value="0" style="width:100%" oninput="dbgKOffset=+this.value||null;document.getElementById('dbgKVal').textContent=this.value>0?this.value:'auto';render()">
+  <input type="range" id="dbgK" min="0" max="3" step="0.05" value="0" style="width:100%" oninput="dbgKOffset=+this.value||null;document.getElementById('dbgKVal').textContent=this.value>0?this.value:'auto';render()">
   <label>minR gap (px beyond center+petal): <span id="dbgMinVal">10</span></label>
   <input type="range" id="dbgMin" min="0" max="40" step="1" value="10" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
   <label>Golden angle (°): <span id="dbgAngVal">137.5</span></label>
@@ -645,7 +645,7 @@ let petalCount=5; // default visible petals
 let globalRotation=0; // degrees offset from dragging outer ring
 
 // Debug layout params (controlled by sliders)
-var dbgSpiralC=1.0;      // spiralC multiplier
+var dbgSpiralC=0.3;      // spiralC multiplier
 var dbgKOffset=null;      // kOffset override (null=auto)
 var dbgMinGap=10;         // px gap beyond center+petal
 var dbgGoldenAngle=137.508; // golden angle in degrees
