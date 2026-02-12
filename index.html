@@ -287,14 +287,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <b style="color:#F2506E;">🔧 Layout Debug</b>
     <span onclick="document.getElementById('debugPanel').style.display='none'" style="cursor:pointer;font-size:18px;">✕</span>
   </div>
-  <label>spiralC multiplier: <span id="dbgCVal">1.00</span></label>
-  <input type="range" id="dbgC" min="0.0" max="0.4" step="0.01" value="0.30" style="width:100%" oninput="dbgSpiralC=+this.value;document.getElementById('dbgCVal').textContent=this.value;render()">
-  <label>kOffset override: <span id="dbgKVal">auto</span></label>
-  <input type="range" id="dbgK" min="0" max="3" step="0.05" value="0" style="width:100%" oninput="dbgKOffset=+this.value||null;document.getElementById('dbgKVal').textContent=this.value>0?this.value:'auto';render()">
-  <label>minR gap (px beyond center+petal): <span id="dbgMinVal">10</span></label>
-  <input type="range" id="dbgMin" min="0" max="40" step="1" value="10" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
-  <label>Golden angle (°): <span id="dbgAngVal">137.5</span></label>
-  <input type="range" id="dbgAng" min="100" max="170" step="0.5" value="137.5" style="width:100%" oninput="dbgGoldenAngle=+this.value;document.getElementById('dbgAngVal').textContent=this.value;render()">
+  <label>Padding (gap between circles): <span id="dbgMinVal">4</span></label>
+  <input type="range" id="dbgMin" min="0" max="20" step="1" value="4" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
   <label>Petal size mult: <span id="dbgPSVal">1.00</span></label>
   <input type="range" id="dbgPS" min="0.4" max="1.5" step="0.05" value="1.00" style="width:100%" oninput="dbgPetalScale=+this.value;document.getElementById('dbgPSVal').textContent=this.value;render()">
 </div>
@@ -645,10 +639,7 @@ let petalCount=5; // default visible petals
 let globalRotation=0; // degrees offset from dragging outer ring
 
 // Debug layout params (controlled by sliders)
-var dbgSpiralC=0.3;      // spiralC multiplier
-var dbgKOffset=null;      // kOffset override (null=auto)
-var dbgMinGap=10;         // px gap beyond center+petal
-var dbgGoldenAngle=137.508; // golden angle in degrees
+var dbgMinGap=4;          // padding between circles
 var dbgPetalScale=1.0;    // petal size multiplier
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
@@ -864,27 +855,83 @@ function render(){
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
-  // Sunflower spiral layout (Vogel's model)
-  // r(k) = c * sqrt(k), θ(k) = k * golden_angle (137.508°)
-  // c chosen so petals don't overlap: adjacent seeds need ~petalDiam spacing
-  // For n petals packed in a circle of radius R: R ≈ c*√n, area per seed ≈ π*c²
-  // We want area per seed ≈ π*(petalR*1.1)² → c ≈ petalR*1.1
-  const goldenAngle=dbgGoldenAngle*Math.PI/180;
-  const petalDiam=petalR*2*dbgPetalScale;
-  const minR=centerR+petalR*dbgPetalScale+Math.round(dbgMinGap*scale);
-  const spiralC=petalDiam*dbgSpiralC;
-  const kOffset=dbgKOffset||Math.pow(minR/spiralC,2);
+  // ── Front-chain circle packing ──
+  // Places petals tightly around center, each tangent to two neighbors
+  const pad=Math.round(dbgMinGap*scale*0.5); // gap between petals
+  const pR=petalR*dbgPetalScale; // effective petal radius
+  const gap=pad; // breathing room between circles
   
-  // Sunflower phyllotaxis: r(k) = c × √(k + kOffset), θ(k) = k × golden_angle
-  const spiralPositions=[];
-  for(let k=0;k<chords.length;k++){
-    const r=spiralC*Math.sqrt(k+kOffset);
-    const theta=k*goldenAngle+(globalRotation*Math.PI/180);
-    spiralPositions.push({r,theta});
+  // Place circle tangent to two existing circles (a,b), radius r3
+  // Returns the candidate position closer to origin (tighter packing)
+  function tangentPos(ax,ay,ar,bx,by,br,r3){
+    const dx=bx-ax,dy=by-ay;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    const ra=ar+r3, rb=br+r3;
+    if(d>ra+rb||d<1e-6)return null; // too far apart or coincident
+    const a2=(ra*ra-rb*rb+d*d)/(2*d);
+    const h2=ra*ra-a2*a2;
+    if(h2<0)return null;
+    const h=Math.sqrt(h2);
+    const mx=ax+a2*dx/d, my=ay+a2*dy/d;
+    const px=h*dy/d, py=h*dx/d;
+    // Two solutions — pick the one closer to origin (center)
+    const s1={x:mx+px,y:my-py}, s2={x:mx-px,y:my+py};
+    const d1=s1.x*s1.x+s1.y*s1.y, d2=s2.x*s2.x+s2.y*s2.y;
+    return d1<d2?s1:s2;
   }
   
-  // Outermost petal radius for ring sizing
-  const outerOrbitR=chords.length>0?spiralPositions[chords.length-1].r:centerR+petalR;
+  // Check if position overlaps any placed circle
+  function overlaps(px,py,r,placed){
+    for(const c of placed){
+      const dx=px-c.x,dy=py-c.y;
+      if(dx*dx+dy*dy<(r+c.r-1)*(r+c.r-1))return true;
+    }
+    return false;
+  }
+  
+  const placed=[{x:0,y:0,r:centerR+gap}]; // center as obstacle
+  const packPositions=[];
+  const effR=pR+gap; // petal radius with padding
+  
+  if(chords.length>0){
+    // Place first petal above center
+    const rotRad=globalRotation*Math.PI/180;
+    const firstX=(centerR+effR)*Math.sin(rotRad);
+    const firstY=-(centerR+effR)*Math.cos(rotRad);
+    packPositions.push({x:firstX,y:firstY});
+    placed.push({x:firstX,y:firstY,r:effR});
+    
+    // Place remaining petals using front-chain
+    for(let k=1;k<chords.length;k++){
+      let bestPos=null,bestDist=Infinity;
+      // Try placing tangent to each pair of already-placed circles
+      for(let i=0;i<placed.length;i++){
+        for(let j=i+1;j<placed.length;j++){
+          const pos=tangentPos(placed[i].x,placed[i].y,placed[i].r,
+                               placed[j].x,placed[j].y,placed[j].r,effR);
+          if(!pos)continue;
+          if(overlaps(pos.x,pos.y,effR,placed))continue;
+          const dist=pos.x*pos.x+pos.y*pos.y;
+          if(dist<bestDist){bestDist=dist;bestPos=pos;}
+        }
+      }
+      if(!bestPos){
+        // Fallback: place at angle around center
+        const angle=k*2.399+rotRad;
+        const r=centerR+effR+k*effR*0.3;
+        bestPos={x:r*Math.cos(angle),y:r*Math.sin(angle)};
+      }
+      packPositions.push(bestPos);
+      placed.push({x:bestPos.x,y:bestPos.y,r:effR});
+    }
+  }
+  
+  // Outermost petal distance for ring sizing
+  let outerOrbitR=centerR+pR;
+  for(const p of packPositions){
+    const d=Math.sqrt(p.x*p.x+p.y*p.y);
+    if(d>outerOrbitR)outerOrbitR=d;
+  }
   const ring=document.getElementById('rotRing');
   const ringR=outerOrbitR+petalR+14;
   ring.style.width=ring.style.height=(ringR*2)+'px';
@@ -914,10 +961,10 @@ function render(){
   const pDiam=Math.round(petalR*2*petalScale);
 
   chords.forEach((ch,i)=>{
-    const sp=spiralPositions[i]||{r:spiralC,theta:0};
+    const pp=packPositions[i]||{x:0,y:0};
     const custom=petalCustomOffsets[i];
-    const px=custom?cx+custom.dx:cx+sp.r*Math.cos(sp.theta);
-    const py=custom?cy+custom.dy:cy+sp.r*Math.sin(sp.theta);
+    const px=custom?cx+custom.dx:cx+pp.x;
+    const py=custom?cy+custom.dy:cy+pp.y;
     const qi=QUALITY[ch.quality]||QUALITY.major;
     const voiceLevel=petalVoicings[i]||0;
 
@@ -1017,12 +1064,14 @@ function render(){
 
   subPetals.forEach((sp,si)=>{
     if(sp.parentIdx>=chords.length)return;
-    const parentSpiral=spiralPositions[sp.parentIdx];
-    if(!parentSpiral)return;
+    const parentPos=packPositions[sp.parentIdx];
+    if(!parentPos)return;
     // Place sub-petals just beyond the parent, offset by voice level
-    const angleOffset=(sp.voiceLevel-2)*0.25;
-    const subR=parentSpiral.r+petalR*1.1;
-    const angle=parentSpiral.theta+angleOffset;
+    const pAngle=Math.atan2(parentPos.y,parentPos.x);
+    const angleOffset=(sp.voiceLevel-2)*0.35;
+    const pDist=Math.sqrt(parentPos.x*parentPos.x+parentPos.y*parentPos.y);
+    const subR=pDist+petalR*1.1;
+    const angle=pAngle+angleOffset;
     const px=cx+subR*Math.cos(angle);
     const py=cy+subR*Math.sin(angle);
     const parentChord=chords[sp.parentIdx];
