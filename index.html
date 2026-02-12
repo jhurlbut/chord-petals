@@ -592,10 +592,6 @@ function render(){
   document.getElementById('centerName').textContent=rootName;
   document.getElementById('centerSub').textContent='major';
 
-  // Scale center circle
-  const cEl=document.getElementById('center');
-  cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
-
   document.getElementById('undoBtn').disabled=history_stack.length<=1;
   document.getElementById('redoBtn').disabled=redoStack.length===0;
 
@@ -608,6 +604,10 @@ function render(){
   // Scale petals to garden size
   const scale=Math.min(gw,gh)/300;
   const centerR=Math.round(48*scale), petalR=Math.round(36*scale);
+
+  // Scale center circle
+  const cEl=document.getElementById('center');
+  cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   const orbitR=centerR+petalR-Math.round(12*scale); // tight overlap
 
   // Rotation ring
