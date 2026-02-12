@@ -873,6 +873,13 @@ let midiAccess=null,midiOutPort=null,midiInPort=null;
 let midiActiveNotes=new Set(),midiHeldNotes=new Set(),midiNoteOffTimers={};
 
 function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open')}
+function closeMidiPanel(){document.getElementById('midiPanel').classList.remove('open')}
+document.addEventListener('pointerdown',(e)=>{
+  const panel=document.getElementById('midiPanel');
+  if(panel.classList.contains('open')&&!panel.contains(e.target)&&!e.target.closest('[onclick*="toggleMidiPanel"]')){
+    closeMidiPanel();
+  }
+});
 function buildMidiChannels(){const s=document.getElementById('midiCh');for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.textContent='Ch '+i;s.appendChild(o);}}
 
 async function initMIDI(){
