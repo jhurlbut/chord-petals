@@ -325,10 +325,30 @@ const MODES = [
   {id:'modal',label:'Modal Interchange',fn:getModalInterchange},
 ];
 
+const SCALE_INTERVALS={
+  major:[0,2,4,5,7,9,11],
+  minor:[0,2,3,5,7,8,10],
+  diminished:[0,2,3,5,6,8,9,11],
+  lydian:[0,2,4,6,7,9,11],
+};
+const SCALE_QUALS={
+  major:['major','minor','minor','major','major','minor','dim'],
+  minor:['minor','dim','major','minor','minor','major','major'],
+  diminished:['dim','dim','dim','dim','dim','dim','dim','dim'],
+  lydian:['major','major','minor','dim','major','minor','minor'],
+};
+const SCALE_NUMS={
+  major:['I','ii','iii','IV','V','vi','vii°'],
+  minor:['i','ii°','III','iv','v','VI','VII'],
+  diminished:['i°','ii°','iii°','iv°','v°','vi°','vii°','viii°'],
+  lydian:['I','II','iii','#iv°','V','vi','vii'],
+};
 function getDiatonic(root){
-  const quals=['major','minor','minor','major','major','minor','dim'];
-  const nums=['I','ii','iii','IV','V','vi','vii°'];
-  return MAJOR_SCALE.map((s,i)=>chord((root+s)%12,quals[i],nums[i]));
+  const sc=currentScale||'major';
+  const intervals=SCALE_INTERVALS[sc]||SCALE_INTERVALS.major;
+  const quals=SCALE_QUALS[sc]||SCALE_QUALS.major;
+  const nums=SCALE_NUMS[sc]||SCALE_NUMS.major;
+  return intervals.map((s,i)=>chord((root+s)%12,quals[i],nums[i]));
 }
 function getCircleOfFifths(root){
   const steps=[-7,-5,-2,0,2,5,7];
@@ -534,6 +554,8 @@ function playChordIntervals(rootNote,intervals){
 // ═══════════════════════════════════════════
 let currentRoot=0;
 let currentMode='diatonic';
+let currentScale='major'; // major, minor, diminished, lydian
+const SCALE_TYPES=['major','minor','diminished','lydian'];
 let history_stack=[{root:0,name:'C'}];
 let redoStack=[];
 let selectedPetal=-1;
@@ -635,6 +657,16 @@ function showKeyPopup(){
   popup.classList.add('show');
 }
 
+// Tap scale name to cycle: major → minor → diminished → lydian
+document.getElementById('centerSub').addEventListener('click',(e)=>{
+  e.stopPropagation();
+  const idx=SCALE_TYPES.indexOf(currentScale);
+  currentScale=SCALE_TYPES[(idx+1)%SCALE_TYPES.length];
+  petalCustomOffsets={};selectedPetal=-1;
+  render();
+});
+document.getElementById('centerSub').style.cursor='pointer';
+
 // Center click — play chord only
 document.getElementById('center').addEventListener('click',(e)=>{
   e.stopPropagation();
@@ -679,7 +711,7 @@ function render(){
   const rootName=noteName(currentRoot,true);
 
   document.getElementById('centerName').textContent=rootName;
-  document.getElementById('centerSub').textContent='major';
+  document.getElementById('centerSub').textContent=currentScale;
 
   document.getElementById('undoBtn').disabled=history_stack.length<=1;
   document.getElementById('redoBtn').disabled=redoStack.length===0;
