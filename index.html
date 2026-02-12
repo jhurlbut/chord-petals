@@ -369,12 +369,27 @@ function getAudio(){
   return audioCtx;
 }
 // Resume audio after tab switch — needs user gesture on iOS
+let audioNeedsRestart=false;
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&audioCtx){
+    audioNeedsRestart=true;
+  }
+});
 function resumeAudioCtx(){
-  if(audioCtx&&audioCtx.state==='suspended'){
-    audioCtx.resume().then(()=>{dismissMuteToast();}).catch(()=>{});
+  if(!audioCtx)return;
+  if(audioCtx.state==='suspended'){
+    audioCtx.resume().catch(()=>{});
+  }
+  // If returning from background, force recreate the audio context
+  if(audioNeedsRestart){
+    audioNeedsRestart=false;
+    if(audioCtx.state==='suspended'){
+      try{audioCtx.close();}catch(e){}
+      audioCtx=null;masterGain=null;reverbNode=null;
+      getAudio(); // recreate fresh
+    }
   }
 }
-document.addEventListener('visibilitychange',resumeAudioCtx);
 ['touchstart','touchend','click','pointerdown','pointerup'].forEach(evt=>{
   document.addEventListener(evt,resumeAudioCtx,{passive:true});
 });
