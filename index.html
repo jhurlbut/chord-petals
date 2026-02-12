@@ -961,20 +961,28 @@ function render(){
       // Parse the petal's solid color to HSL, then darken V by 5% per ring
       const solidColor=qi.solid;
       ringsHTML=`<svg class="petal-rings" viewBox="0 0 ${pDiam} ${pDiam}" width="${pDiam}" height="${pDiam}">`;
+      // Convert hex to HSL, decrease L by 5% per ring
+      const hexMatch=solidColor.match(/#([0-9a-f]{6})/i);
+      let h=0,s=0,l=50;
+      if(hexMatch){
+        let R=parseInt(hexMatch[1].slice(0,2),16)/255;
+        let G=parseInt(hexMatch[1].slice(2,4),16)/255;
+        let B=parseInt(hexMatch[1].slice(4,6),16)/255;
+        const max=Math.max(R,G,B),min=Math.min(R,G,B);
+        l=(max+min)/2;
+        if(max!==min){
+          const d=max-min;
+          s=l>0.5?d/(2-max-min):d/(max+min);
+          if(max===R)h=((G-B)/d+(G<B?6:0))/6;
+          else if(max===G)h=((B-R)/d+2)/6;
+          else h=((R-G)/d+4)/6;
+        }
+        h=Math.round(h*360);s=Math.round(s*100);l=Math.round(l*100);
+      }
       for(let r=1;r<=voiceLevel;r++){
         const rr=half-r*(half/(voiceLevel+1.5));
-        // Darken by reducing brightness: multiply RGB by (1 - r*0.05)
-        const factor=1-r*0.05;
-        // Parse hex or rgb
-        let fillColor=solidColor;
-        const hexMatch=solidColor.match(/#([0-9a-f]{6})/i);
-        if(hexMatch){
-          const R=Math.round(parseInt(hexMatch[1].slice(0,2),16)*factor);
-          const G=Math.round(parseInt(hexMatch[1].slice(2,4),16)*factor);
-          const B=Math.round(parseInt(hexMatch[1].slice(4,6),16)*factor);
-          fillColor=`rgb(${R},${G},${B})`;
-        }
-        ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="${fillColor}" />`;
+        const darkL=Math.max(0,l-r*5); // decrease lightness by 5% per ring
+        ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="hsl(${h},${s}%,${darkL}%)" />`;
       }
       ringsHTML+='</svg>';
     }
