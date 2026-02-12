@@ -908,6 +908,7 @@ function render(){
     el.dataset.index=i;
     // Store chord data for event handlers
     el._chordData={ch,i,voiceLevel};
+    el._basePos={x:px-pDiam/2,y:py-pDiam/2};
 
     // Build innerHTML only if content changed
     let ringsHTML='';
@@ -938,8 +939,9 @@ function render(){
         const ext=VOICING_EXTENSIONS[c.quality];
         if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
         else playChord(c.root,c.quality);
-        // Spring animation via rAF
-        const baseT=`translate(${parseFloat(el.style.transform.match(/translate\(([^,]+)/)?.[1]||0)}px,${parseFloat(el.style.transform.match(/,\s*([^)]+)/)?.[1]||0)}px)`;
+        // Spring animation
+        const bp=el._basePos||{x:0,y:0};
+        const baseT=`translate(${bp.x}px,${bp.y}px)`;
         el.style.transition='transform 0.1s ease-out';
         el.style.transform=baseT+' scale(0.88)';
         setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT+' scale(1.06)';},100);
@@ -985,7 +987,7 @@ function render(){
   }
   const subPetalScale=0.7;
   const subDiam=Math.round(petalR*2*subPetalScale);
-  const subOrbitR=orbitR1+orbitGap*1.1; // outer ring
+  const subOrbitR=orbitR1+petalR*1.2; // just outside inner ring, close to parents
 
   subPetals.forEach((sp,si)=>{
     if(sp.parentIdx>=chords.length)return;
