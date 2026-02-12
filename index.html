@@ -763,9 +763,12 @@ function render(){
         playChord(ch.root,ch.quality);
       }
       sendMIDIChord(ch.root,ch.quality);
-      // Pulse
+      // Spring animation
+      el.style.transition='transform 0.1s ease-out';
       el.style.transform='translate(-50%,-50%) scale(0.88)';
-      setTimeout(()=>{el.style.transform='translate(-50%,-50%)';render();},120);
+      setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform='translate(-50%,-50%) scale(1.06)';},100);
+      setTimeout(()=>{el.style.transition='transform 0.25s cubic-bezier(0.34,1.2,0.64,1)';el.style.transform='translate(-50%,-50%) scale(0.97)';},350);
+      setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform='translate(-50%,-50%)';render();},550);
     });
 
     // Double-tap to navigate, long-press to cycle voicing
