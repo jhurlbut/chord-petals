@@ -553,7 +553,17 @@ function playNote(ctx,freq,startTime,noteGain,duration){
 function playChordNotes(rootNote,intervals){
   if(!soundOn)return;
   checkMuteState();
-  const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
+  // Force-recreate AudioContext if suspended (iOS kills it after tab switch/lock)
+  let ctx=getAudio();
+  if(ctx.state==='suspended'){
+    ctx.resume().catch(()=>{});
+    // If still suspended after resume attempt, nuke and recreate
+    if(ctx.state==='suspended'){
+      try{ctx.close();}catch(e){}
+      audioCtx=null;masterGain=null;reverbNode=null;
+      ctx=getAudio();
+    }
+  }
   const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
   const voiced=applyVoicing(intervals);
   const now=ctx.currentTime;
