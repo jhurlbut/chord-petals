@@ -952,7 +952,9 @@ function render(){
     // Attach event handlers only once
     if(!el._eventsAttached){
       el._eventsAttached=true;
-      el.addEventListener('click',(e)=>{
+      // Use pointerup instead of click — iOS Safari suppresses click
+      // on elements with pointerdown handlers
+      el.addEventListener('pointerup',(e)=>{
         if(el._wasDragged)return;
         e.stopPropagation();
         const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
@@ -1045,7 +1047,7 @@ function render(){
 
     if(!el._eventsAttached){
       el._eventsAttached=true;
-      el.addEventListener('click',(e)=>{
+      el.addEventListener('pointerup',(e)=>{
         if(el._wasDragged)return;
         e.stopPropagation();
         const{sp:s,parentChord:pc}=el._subData;
