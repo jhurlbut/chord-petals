@@ -856,7 +856,7 @@ function render(){
 
   const garden=document.getElementById('garden');
   const gw=_gardenW,gh=_gardenH;
-  let cx=gw/2, cy=gh*0.47; // slightly above center to account for bottom controls
+  let cx=gw/2, cy=gh*0.53; // slightly below geometric center to account for header chrome
   const scale=Math.min(gw,gh)/300;
   const centerR=Math.round(48*scale), petalR=Math.round(36*scale);
 
