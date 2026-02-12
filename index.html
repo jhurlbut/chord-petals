@@ -287,9 +287,15 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <b style="color:#F2506E;">🔧 Layout Debug</b>
     <span onclick="document.getElementById('debugPanel').style.display='none'" style="cursor:pointer;font-size:18px;">✕</span>
   </div>
-  <label>Padding (gap between circles): <span id="dbgMinVal">4</span></label>
+  <label>Spread (orbit distance): <span id="dbgSpreadVal">1.00</span></label>
+  <input type="range" id="dbgSpread" min="0.5" max="2.0" step="0.05" value="1.00" style="width:100%" oninput="dbgSpread=+this.value;document.getElementById('dbgSpreadVal').textContent=this.value;render()">
+  <label>Overlap: <span id="dbgOverlapVal">0.00</span></label>
+  <input type="range" id="dbgOverlap" min="-0.3" max="0.5" step="0.02" value="0.00" style="width:100%" oninput="dbgOverlap=+this.value;document.getElementById('dbgOverlapVal').textContent=this.value;render()">
+  <label>Ring angle offset: <span id="dbgOffsetVal">0.30</span></label>
+  <input type="range" id="dbgOffset" min="0" max="1.0" step="0.02" value="0.30" style="width:100%" oninput="dbgRingOffset=+this.value;document.getElementById('dbgOffsetVal').textContent=this.value;render()">
+  <label>Padding: <span id="dbgMinVal">4</span></label>
   <input type="range" id="dbgMin" min="0" max="20" step="1" value="4" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
-  <label>Petal size mult: <span id="dbgPSVal">1.00</span></label>
+  <label>Petal size: <span id="dbgPSVal">1.00</span></label>
   <input type="range" id="dbgPS" min="0.4" max="1.5" step="0.05" value="1.00" style="width:100%" oninput="dbgPetalScale=+this.value;document.getElementById('dbgPSVal').textContent=this.value;render()">
 </div>
 
@@ -641,6 +647,9 @@ let globalRotation=0; // degrees offset from dragging outer ring
 // Debug layout params (controlled by sliders)
 var dbgMinGap=4;          // padding between circles
 var dbgPetalScale=1.0;    // petal size multiplier
+var dbgSpread=1.0;        // orbit distance multiplier
+var dbgOverlap=0.0;       // petal overlap (0=none, 1=full)
+var dbgRingOffset=0.3;    // angle offset per ring (radians)
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
@@ -855,93 +864,40 @@ function render(){
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
-  // ── Front-chain circle packing ──
-  // Places petals tightly around center, each tangent to two neighbors
-  const pad=Math.round(dbgMinGap*scale*0.5); // gap between petals
-  const pR=petalR*dbgPetalScale; // effective petal radius
-  const gap=pad; // breathing room between circles
-  
-  // Place circle tangent to two existing circles (a,b), radius r3
-  // Returns the candidate position closer to origin (tighter packing)
-  function tangentPos(ax,ay,ar,bx,by,br,r3){
-    const dx=bx-ax,dy=by-ay;
-    const d=Math.sqrt(dx*dx+dy*dy);
-    const ra=ar+r3, rb=br+r3;
-    if(d>ra+rb||d<1e-6)return null; // too far apart or coincident
-    const a2=(ra*ra-rb*rb+d*d)/(2*d);
-    const h2=ra*ra-a2*a2;
-    if(h2<0)return null;
-    const h=Math.sqrt(h2);
-    const mx=ax+a2*dx/d, my=ay+a2*dy/d;
-    const px=h*dy/d, py=h*dx/d;
-    // Two solutions — pick the one closer to origin (center)
-    const s1={x:mx+px,y:my-py}, s2={x:mx-px,y:my+py};
-    const d1=s1.x*s1.x+s1.y*s1.y, d2=s2.x*s2.x+s2.y*s2.y;
-    return d1<d2?s1:s2;
-  }
-  
-  // Check if position overlaps any placed circle
-  function overlaps(px,py,r,placed){
-    for(const c of placed){
-      const dx=px-c.x,dy=py-c.y;
-      if(dx*dx+dy*dy<(r+c.r-1)*(r+c.r-1))return true;
-    }
-    return false;
-  }
-  
-  const placed=[{x:0,y:0,r:centerR+gap}]; // center as obstacle
-  const packPositions=[];
-  const effR=pR+gap; // petal radius with padding
+  // ── Radial ring layout ──
+  // Concentric rings around center with angle offset per ring
+  const pR=petalR*dbgPetalScale;
+  const spread=dbgSpread; // orbit distance multiplier
+  const overlap=dbgOverlap; // how much petals can overlap (0=none, 1=full)
+  const ringOffset=dbgRingOffset; // angle offset per ring in radians
   const rotRad=globalRotation*Math.PI/180;
   
-  if(chords.length>0){
-    // Place first petal at top
-    const firstX=(centerR+effR)*Math.sin(rotRad);
-    const firstY=-(centerR+effR)*Math.cos(rotRad);
-    packPositions.push({x:firstX,y:firstY});
-    placed.push({x:firstX,y:firstY,r:effR});
+  // Calculate how many fit per ring based on orbit radius
+  const ringGap=pR*2*(1-overlap)+dbgMinGap; // effective diameter with overlap
+  const orbitR1=centerR+pR*spread; // first ring orbit
+  
+  // Distribute petals into rings
+  const packPositions=[];
+  let remaining=chords.length;
+  let ringIdx=0;
+  let placed=0;
+  while(remaining>0){
+    const orbitR=orbitR1+ringIdx*ringGap*spread;
+    // How many circles fit on this ring? circumference / effective diameter
+    const maxFit=ringIdx===0?Math.max(1,Math.floor(Math.PI*2*orbitR/ringGap)):
+                              Math.max(1,Math.floor(Math.PI*2*orbitR/ringGap));
+    const count=Math.min(maxFit,remaining);
+    const angleStep=2*Math.PI/count;
+    const offset=ringIdx*ringOffset+rotRad;
     
-    for(let k=1;k<chords.length;k++){
-      let bestPos=null,bestDist=Infinity;
-      // Collect all valid candidate positions
-      for(let i=0;i<placed.length;i++){
-        for(let j=i+1;j<placed.length;j++){
-          // Get both tangent solutions
-          const dx=placed[j].x-placed[i].x,dy=placed[j].y-placed[i].y;
-          const d=Math.sqrt(dx*dx+dy*dy);
-          const ra=placed[i].r+effR, rb=placed[j].r+effR;
-          if(d>ra+rb||d<1e-6)continue;
-          const a2=(ra*ra-rb*rb+d*d)/(2*d);
-          const h2=ra*ra-a2*a2;
-          if(h2<0)continue;
-          const h=Math.sqrt(h2);
-          const mx=placed[i].x+a2*dx/d,my=placed[i].y+a2*dy/d;
-          const px=h*dy/d,py=h*dx/d;
-          const candidates=[{x:mx+px,y:my-py},{x:mx-px,y:my+py}];
-          
-          for(const pos of candidates){
-            // Check overlap with all placed circles
-            let ok=true;
-            for(const c of placed){
-              const ddx=pos.x-c.x,ddy=pos.y-c.y;
-              const minD=effR+c.r-2; // allow slight tangent overlap
-              if(ddx*ddx+ddy*ddy<minD*minD){ok=false;break;}
-            }
-            if(!ok)continue;
-            const dist=pos.x*pos.x+pos.y*pos.y;
-            if(dist<bestDist){bestDist=dist;bestPos=pos;}
-          }
-        }
-      }
-      if(!bestPos){
-        // Fallback: evenly spaced ring
-        const angle=k*2*Math.PI/chords.length+rotRad;
-        const r=centerR+effR;
-        bestPos={x:r*Math.cos(angle),y:r*Math.sin(angle)};
-      }
-      packPositions.push(bestPos);
-      placed.push({x:bestPos.x,y:bestPos.y,r:effR});
+    for(let i=0;i<count;i++){
+      const angle=angleStep*i-Math.PI/2+offset; // start at top
+      packPositions.push({x:orbitR*Math.cos(angle),y:orbitR*Math.sin(angle)});
     }
+    remaining-=count;
+    placed+=count;
+    ringIdx++;
+    if(ringIdx>10)break; // safety
   }
   
   // Outermost petal distance for ring sizing
