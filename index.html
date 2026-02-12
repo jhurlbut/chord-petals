@@ -802,11 +802,11 @@ function render(){
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
-  const orbitR1=centerR+petalR-Math.round(12*scale); // inner orbit
-  const orbitGap=petalR*1.6; // gap between rings
+  const orbitR1=centerR+petalR-Math.round(8*scale); // inner orbit
+  const orbitGap=petalR*1.8; // gap between rings
 
   // Determine how many rings we need and how to distribute petals
-  const maxPerRing=7; // max petals in inner ring
+  const maxPerRing=6; // max petals in inner ring
   const numRings=Math.ceil(chords.length/maxPerRing);
   
   // Build ring assignments: distribute petals across rings
