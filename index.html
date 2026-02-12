@@ -981,7 +981,7 @@ function render(){
       }
       for(let r=1;r<=voiceLevel;r++){
         const rr=half-r*(half/(voiceLevel+1.5));
-        const darkL=Math.max(0,l-r*5); // decrease lightness by 5% per ring
+        const darkL=Math.max(0,l-r*10); // decrease lightness by 10% per ring
         ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="hsl(${h},${s}%,${darkL}%)" />`;
       }
       ringsHTML+='</svg>';
