@@ -249,7 +249,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div class="midi-panel" id="voicePanel">
   <h3>🎛 Voicing & Phrasing</h3>
   <label>Bass Root</label>
-  <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="bassRoot=this.checked"><span class="sw"></span>Play root in bass octave</label>
+  <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>Play root in bass octave</label>
   <label>Voicing</label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
     <button class="voice-opt active" data-voice="close" onclick="setVoiceMode('close')">Close</button>
@@ -1067,6 +1067,7 @@ function toggleVoicePanel(){
   document.getElementById('voicePanel').classList.toggle('open');
   document.getElementById('midiPanel').classList.remove('open');
 }
+function toggleBass(v){bassRoot=v;}
 function setVoiceMode(m){
   voicingMode=m;
   document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
