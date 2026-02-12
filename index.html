@@ -621,13 +621,6 @@ function render(){
   delRing.style.width=delRing.style.height=(ringR*2)+'px';
   delRing.style.left=(cx-ringR)+'px';delRing.style.top=(cy-ringR)+'px';
 
-  // Debug - show dimensions on screen
-  const dbg=`${gw}x${gh} s=${scale.toFixed(2)} cR=${centerR} pR=${petalR} oR=${orbitR} n=${chords.length} petals=${petalCount}`;
-  document.title=dbg;
-  let dbgEl=document.getElementById('debugBar');
-  if(!dbgEl){dbgEl=document.createElement('div');dbgEl.id='debugBar';dbgEl.style.cssText='position:fixed;top:0;left:0;right:0;background:red;color:white;font-size:10px;padding:2px 6px;z-index:9999;text-align:center';document.body.appendChild(dbgEl);}
-  dbgEl.textContent=dbg;
-
   // Remove old petals
   petalElements.forEach(el=>el.remove());
   petalElements=[];
