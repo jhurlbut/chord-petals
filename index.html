@@ -647,7 +647,10 @@ document.addEventListener('click',(e)=>{
 
 // Tap empty space in garden to add a petal
 function gardenEmptyTap(e){
-  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring'))return;
+  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
+  // Don't add petal if we just closed the MIDI panel
+  const midiPanel=document.getElementById('midiPanel');
+  if(midiPanel._justClosed){delete midiPanel._justClosed;return;}
   addPetal();
 }
 document.getElementById('garden').addEventListener('click',gardenEmptyTap);
@@ -729,7 +732,9 @@ function render(){
     // Voicing label suffix
     const vLabel=VOICING_LABELS[voiceLevel]||'';
     const displayName=showNames?(ch.name.replace(/(m7|7|maj7|ø7)$/,'')+vLabel|| ch.name):'';
-    el.innerHTML=`${ringsHTML}<span class="petal-label">${showNames?ch.name+(voiceLevel>0?' →'+['','7th','9th','11th'][voiceLevel]:''):''}</span>`;
+    const voiceTag=voiceLevel>0?` ${['','7th','9th','11th'][voiceLevel]}`:'';
+    const noteCount=voiceLevel>0?[3,4,5,6][voiceLevel]+'♪':'';
+    el.innerHTML=`${ringsHTML}<span class="petal-label">${showNames?ch.name+voiceTag:noteCount}</span>`;
     el.dataset.index=i;
 
     // Click
@@ -893,7 +898,12 @@ let midiAccess=null,midiOutPort=null,midiInPort=null;
 let midiActiveNotes=new Set(),midiHeldNotes=new Set(),midiNoteOffTimers={};
 
 function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open')}
-function closeMidiPanel(){document.getElementById('midiPanel').classList.remove('open')}
+function closeMidiPanel(){
+  const panel=document.getElementById('midiPanel');
+  panel.classList.remove('open');
+  panel._justClosed=true;
+  setTimeout(()=>{delete panel._justClosed;},300);
+}
 document.addEventListener('pointerdown',(e)=>{
   const panel=document.getElementById('midiPanel');
   if(panel.classList.contains('open')&&!panel.contains(e.target)&&!e.target.closest('[onclick*="toggleMidiPanel"]')){
