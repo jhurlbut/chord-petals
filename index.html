@@ -892,33 +892,50 @@ function render(){
   const placed=[{x:0,y:0,r:centerR+gap}]; // center as obstacle
   const packPositions=[];
   const effR=pR+gap; // petal radius with padding
+  const rotRad=globalRotation*Math.PI/180;
   
   if(chords.length>0){
-    // Place first petal above center
-    const rotRad=globalRotation*Math.PI/180;
+    // Place first petal at top
     const firstX=(centerR+effR)*Math.sin(rotRad);
     const firstY=-(centerR+effR)*Math.cos(rotRad);
     packPositions.push({x:firstX,y:firstY});
     placed.push({x:firstX,y:firstY,r:effR});
     
-    // Place remaining petals using front-chain
     for(let k=1;k<chords.length;k++){
       let bestPos=null,bestDist=Infinity;
-      // Try placing tangent to each pair of already-placed circles
+      // Collect all valid candidate positions
       for(let i=0;i<placed.length;i++){
         for(let j=i+1;j<placed.length;j++){
-          const pos=tangentPos(placed[i].x,placed[i].y,placed[i].r,
-                               placed[j].x,placed[j].y,placed[j].r,effR);
-          if(!pos)continue;
-          if(overlaps(pos.x,pos.y,effR,placed))continue;
-          const dist=pos.x*pos.x+pos.y*pos.y;
-          if(dist<bestDist){bestDist=dist;bestPos=pos;}
+          // Get both tangent solutions
+          const dx=placed[j].x-placed[i].x,dy=placed[j].y-placed[i].y;
+          const d=Math.sqrt(dx*dx+dy*dy);
+          const ra=placed[i].r+effR, rb=placed[j].r+effR;
+          if(d>ra+rb||d<1e-6)continue;
+          const a2=(ra*ra-rb*rb+d*d)/(2*d);
+          const h2=ra*ra-a2*a2;
+          if(h2<0)continue;
+          const h=Math.sqrt(h2);
+          const mx=placed[i].x+a2*dx/d,my=placed[i].y+a2*dy/d;
+          const px=h*dy/d,py=h*dx/d;
+          const candidates=[{x:mx+px,y:my-py},{x:mx-px,y:my+py}];
+          
+          for(const pos of candidates){
+            // Check overlap with all placed circles
+            let ok=true;
+            for(const c of placed){
+              const ddx=pos.x-c.x,ddy=pos.y-c.y;
+              if(ddx*ddx+ddy*ddy<(effR+c.r-0.5)*(effR+c.r-0.5)){ok=false;break;}
+            }
+            if(!ok)continue;
+            const dist=pos.x*pos.x+pos.y*pos.y;
+            if(dist<bestDist){bestDist=dist;bestPos=pos;}
+          }
         }
       }
       if(!bestPos){
-        // Fallback: place at angle around center
-        const angle=k*2.399+rotRad;
-        const r=centerR+effR+k*effR*0.3;
+        // Fallback: evenly spaced ring
+        const angle=k*2*Math.PI/chords.length+rotRad;
+        const r=centerR+effR;
         bestPos={x:r*Math.cos(angle),y:r*Math.sin(angle)};
       }
       packPositions.push(bestPos);
