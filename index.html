@@ -503,10 +503,30 @@ function playChordNotes(rootNote,intervals){
   const now=ctx.currentTime;
   activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
   activeVoices=[];
-  const allNotes=bassRoot?[-12,...voiced]:voiced;
-  const noteGain=0.12/allNotes.length;
+  const noteGain=0.12/voiced.length;
   const total=phraseMode==='arpeggio'?2.4:1.8;
-  allNotes.forEach((semi,i)=>{
+  // Play bass root note separately with boosted volume and sine wave
+  if(bassRoot){
+    const bassFreq=baseFreq*Math.pow(2,-24/12); // 2 octaves down
+    const bassGain=ctx.createGain();
+    const bassAttack=0.01,bassDur=total+0.5;
+    bassGain.gain.setValueAtTime(0.001,now);
+    bassGain.gain.linearRampToValueAtTime(0.18,now+bassAttack);
+    bassGain.gain.setValueAtTime(0.15,now+bassDur*0.6);
+    bassGain.gain.exponentialRampToValueAtTime(0.001,now+bassDur);
+    const bassOsc=ctx.createOscillator();bassOsc.type='sine';bassOsc.frequency.value=bassFreq;
+    const bassOsc2=ctx.createOscillator();bassOsc2.type='triangle';bassOsc2.frequency.value=bassFreq;
+    const mix1=ctx.createGain();mix1.gain.value=0.6;
+    const mix2=ctx.createGain();mix2.gain.value=0.4;
+    bassOsc.connect(mix1);bassOsc2.connect(mix2);
+    mix1.connect(bassGain);mix2.connect(bassGain);
+    bassGain.connect(masterGain);
+    bassOsc.start(now);bassOsc.stop(now+bassDur+0.1);
+    bassOsc2.start(now);bassOsc2.stop(now+bassDur+0.1);
+    activeVoices.push({gain:bassGain,stop:(t)=>{try{bassOsc.stop(t);bassOsc2.stop(t);}catch(e){}}});
+  }
+  // Play chord notes
+  voiced.forEach((semi,i)=>{
     const freq=baseFreq*Math.pow(2,semi/12);
     const delay=phraseMode==='strum'?i*0.03:phraseMode==='arpeggio'?i*0.15:0;
     const dur=phraseMode==='arpeggio'?total-delay:total;
