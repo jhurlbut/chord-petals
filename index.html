@@ -924,7 +924,8 @@ function render(){
             let ok=true;
             for(const c of placed){
               const ddx=pos.x-c.x,ddy=pos.y-c.y;
-              if(ddx*ddx+ddy*ddy<(effR+c.r-0.5)*(effR+c.r-0.5)){ok=false;break;}
+              const minD=effR+c.r-2; // allow slight tangent overlap
+              if(ddx*ddx+ddy*ddy<minD*minD){ok=false;break;}
             }
             if(!ok)continue;
             const dist=pos.x*pos.x+pos.y*pos.y;
