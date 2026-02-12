@@ -243,6 +243,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="tool-btn" id="lockBtn" onclick="toggleLock()" title="Lock root">🔓</button>
     <button class="tool-btn" id="voiceBtn" onclick="toggleVoicePanel()" title="Voicing">🎛</button>
     <button class="tool-btn" onclick="toggleMidiPanel()" title="MIDI">🎹</button>
+    <button class="tool-btn" onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" title="Debug Layout">🔧</button>
   </div>
 </div>
 
@@ -278,6 +279,24 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
     <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
   </div>
+</div>
+
+<!-- Debug Layout Panel -->
+<div id="debugPanel" style="display:none;position:fixed;bottom:60px;left:10px;right:10px;background:rgba(20,10,30,0.95);border:1px solid #F2506E;border-radius:12px;padding:12px;z-index:9999;font-size:12px;color:#fff;max-height:50vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <b style="color:#F2506E;">🔧 Layout Debug</b>
+    <span onclick="document.getElementById('debugPanel').style.display='none'" style="cursor:pointer;font-size:18px;">✕</span>
+  </div>
+  <label>spiralC multiplier: <span id="dbgCVal">1.00</span></label>
+  <input type="range" id="dbgC" min="0.3" max="2.0" step="0.05" value="1.00" style="width:100%" oninput="dbgSpiralC=+this.value;document.getElementById('dbgCVal').textContent=this.value;render()">
+  <label>kOffset override: <span id="dbgKVal">auto</span></label>
+  <input type="range" id="dbgK" min="0" max="10" step="0.1" value="0" style="width:100%" oninput="dbgKOffset=+this.value||null;document.getElementById('dbgKVal').textContent=this.value>0?this.value:'auto';render()">
+  <label>minR gap (px beyond center+petal): <span id="dbgMinVal">10</span></label>
+  <input type="range" id="dbgMin" min="0" max="40" step="1" value="10" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
+  <label>Golden angle (°): <span id="dbgAngVal">137.5</span></label>
+  <input type="range" id="dbgAng" min="100" max="170" step="0.5" value="137.5" style="width:100%" oninput="dbgGoldenAngle=+this.value;document.getElementById('dbgAngVal').textContent=this.value;render()">
+  <label>Petal size mult: <span id="dbgPSVal">1.00</span></label>
+  <input type="range" id="dbgPS" min="0.4" max="1.5" step="0.05" value="1.00" style="width:100%" oninput="dbgPetalScale=+this.value;document.getElementById('dbgPSVal').textContent=this.value;render()">
 </div>
 
 <!-- MIDI Panel -->
@@ -614,6 +633,13 @@ const VOICING_MODES=['close','open','spread'];
 const PHRASE_MODES=['block','strum','arpeggio'];
 let petalCount=5; // default visible petals
 let globalRotation=0; // degrees offset from dragging outer ring
+
+// Debug layout params (controlled by sliders)
+var dbgSpiralC=1.0;      // spiralC multiplier
+var dbgKOffset=null;      // kOffset override (null=auto)
+var dbgMinGap=10;         // px gap beyond center+petal
+var dbgGoldenAngle=137.508; // golden angle in degrees
+var dbgPetalScale=1.0;    // petal size multiplier
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
@@ -834,19 +860,13 @@ function render(){
   // c chosen so petals don't overlap: adjacent seeds need ~petalDiam spacing
   // For n petals packed in a circle of radius R: R ≈ c*√n, area per seed ≈ π*c²
   // We want area per seed ≈ π*(petalR*1.1)² → c ≈ petalR*1.1
-  const goldenAngle=137.508*Math.PI/180; // ~2.39996 radians
-  // Vogel's model: r(k) = c * √k, θ(k) = k * 137.5°
-  // To avoid overlap, area per petal ≈ π*c² must fit a circle of diameter 2*petalR
-  // So c ≈ 2*petalR / √(π) ≈ petalR * 1.13, but we add padding
-  const petalDiam=petalR*2;
-  const minR=centerR+petalR+Math.round(10*scale); // first petal clears center
-  // Sunflower phyllotaxis: θ = k × golden_angle, r = c × √k
-  // For small petal counts (<20), boost the spacing constant so petals
-  // don't bunch near center. kOffset shifts the √k curve outward.
-  const spiralC=petalDiam*1.0; // generous spacing
-  const kOffset=Math.pow(minR/spiralC,2); // ensures r(0) = minR
+  const goldenAngle=dbgGoldenAngle*Math.PI/180;
+  const petalDiam=petalR*2*dbgPetalScale;
+  const minR=centerR+petalR*dbgPetalScale+Math.round(dbgMinGap*scale);
+  const spiralC=petalDiam*dbgSpiralC;
+  const kOffset=dbgKOffset||Math.pow(minR/spiralC,2);
   
-  // Compute spiral positions for each petal
+  // Sunflower phyllotaxis: r(k) = c × √(k + kOffset), θ(k) = k × golden_angle
   const spiralPositions=[];
   for(let k=0;k<chords.length;k++){
     const r=spiralC*Math.sqrt(k+kOffset);
@@ -881,7 +901,7 @@ function render(){
   }
 
   // Scale down petals when there are many
-  const petalScale=chords.length>7?Math.max(0.6,1-(chords.length-7)*0.04):1;
+  const petalScale=(chords.length>7?Math.max(0.6,1-(chords.length-7)*0.04):1)*dbgPetalScale;
   const pDiam=Math.round(petalR*2*petalScale);
 
   chords.forEach((ch,i)=>{
