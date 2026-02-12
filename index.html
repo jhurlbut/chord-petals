@@ -906,7 +906,7 @@ function render(){
     if(d>outerOrbitR)outerOrbitR=d;
   }
   const ring=document.getElementById('rotRing');
-  const ringR=outerOrbitR+petalR+14;
+  const ringR=outerOrbitR+pR+14;
   ring.style.width=ring.style.height=(ringR*2)+'px';
   ring.style.left=(cx-ringR)+'px';ring.style.top=(cy-ringR)+'px';
 
@@ -943,7 +943,7 @@ function render(){
 
     const el=petalElements[i];
     // Use transform for GPU-accelerated positioning
-    el.style.transform=`translate(${px-petalR}px,${py-petalR}px)`;
+    el.style.transform=`translate(${px-pDiam/2}px,${py-pDiam/2}px)`;
     el.style.width=pDiam+'px';el.style.height=pDiam+'px';
     el.style.left='0';el.style.top='0';
     el.style.background=qi.solid;
@@ -988,7 +988,7 @@ function render(){
     }
     const voiceTag=voiceLevel>0?` ${['','7th','9th','11th'][voiceLevel]}`:'';
     const noteCount=voiceLevel>0?[3,4,5,6][voiceLevel]+'♪':'';
-    const fontSize=Math.max(9,Math.round(petalR*0.38*petalScale));
+    const fontSize=Math.max(9,Math.round(pR*0.38*petalScale));
     // Text rendered after SVG so it sits on top
     const newHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px;position:relative;z-index:2">${showNames?ch.name+voiceTag:noteCount}</span>`;
     if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
@@ -1057,7 +1057,7 @@ function render(){
     subPetalElements.push(el);
   }
   const subPetalScale=0.7;
-  const subDiam=Math.round(petalR*2*subPetalScale);
+  const subDiam=Math.round(pR*2*subPetalScale);
 
   subPetals.forEach((sp,si)=>{
     if(sp.parentIdx>=chords.length)return;
@@ -1067,7 +1067,7 @@ function render(){
     const pAngle=Math.atan2(parentPos.y,parentPos.x);
     const angleOffset=(sp.voiceLevel-2)*0.35;
     const pDist=Math.sqrt(parentPos.x*parentPos.x+parentPos.y*parentPos.y);
-    const subR=pDist+petalR*1.1;
+    const subR=pDist+pR*1.1;
     const angle=pAngle+angleOffset;
     const px=cx+subR*Math.cos(angle);
     const py=cy+subR*Math.sin(angle);
@@ -1087,7 +1087,7 @@ function render(){
     el._subData={sp,parentChord,si};
 
     const voiceLabel=VOICING_LABELS[sp.voiceLevel]||'';
-    const fontSize=Math.max(8,Math.round(petalR*0.3*subPetalScale));
+    const fontSize=Math.max(8,Math.round(pR*0.3*subPetalScale));
     const newHTML=`<span class="petal-label" style="font-size:${fontSize}px">${showNames?parentChord.name+voiceLabel:voiceLabel}</span>`;
     if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
 
