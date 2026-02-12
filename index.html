@@ -956,10 +956,13 @@ function render(){
     // Build innerHTML only if content changed
     let ringsHTML='';
     if(voiceLevel>0){
+      const half=pDiam/2;
       ringsHTML=`<svg class="petal-rings" viewBox="0 0 ${pDiam} ${pDiam}" width="${pDiam}" height="${pDiam}">`;
+      // Filled circles in progressively darker shades of the petal color
       for(let r=1;r<=voiceLevel;r++){
-        const rr=petalR-r*(petalR/5);
-        ringsHTML+=`<circle cx="${petalR}" cy="${petalR}" r="${rr}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>`;
+        const rr=half-r*(half/(voiceLevel+1.5));
+        const darken=r*0.15; // 15% darker per ring
+        ringsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="rgba(0,0,0,${darken})" />`;
       }
       ringsHTML+='</svg>';
     }
