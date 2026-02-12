@@ -617,7 +617,7 @@ function buildKeyPopup(){
 function showKeyPopup(){
   const popup=document.getElementById('keyPopup');
   popup.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('current',i===currentRoot));
-  popup.classList.toggle('show');
+  popup.classList.add('show');
 }
 
 // Center click — play chord only
@@ -636,14 +636,6 @@ document.getElementById('center').addEventListener('pointerdown',(e)=>{
 });
 document.getElementById('center').addEventListener('pointerup',()=>{if(centerLongPressT)clearTimeout(centerLongPressT);});
 document.getElementById('center').addEventListener('pointermove',()=>{if(centerLongPressT)clearTimeout(centerLongPressT);});
-// Long-press / double-tap center for key selector
-let centerTapTimer=null,centerTapCount=0;
-document.getElementById('center').addEventListener('pointerdown',(e)=>{
-  centerTapCount++;
-  if(centerTapCount===2){clearTimeout(centerTapTimer);centerTapCount=0;showKeyPopup();return;}
-  centerTapTimer=setTimeout(()=>centerTapCount=0,400);
-});
-
 // Close key popup on outside click
 document.addEventListener('click',(e)=>{
   if(e.target.closest('.key-popup')||e.target.closest('.center-chord'))return;
