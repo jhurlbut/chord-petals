@@ -848,6 +848,8 @@ function render(){
   // Scale center circle
   const cEl=document.getElementById('center');
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
+  document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
+  document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
   const orbitR=centerR+petalR-Math.round(12*scale); // tight overlap
 
   // Rotation ring
@@ -897,7 +899,8 @@ function render(){
     const displayName=showNames?(ch.name.replace(/(m7|7|maj7|ø7)$/,'')+vLabel|| ch.name):'';
     const voiceTag=voiceLevel>0?` ${['','7th','9th','11th'][voiceLevel]}`:'';
     const noteCount=voiceLevel>0?[3,4,5,6][voiceLevel]+'♪':'';
-    el.innerHTML=`${ringsHTML}<span class="petal-label">${showNames?ch.name+voiceTag:noteCount}</span>`;
+    const fontSize=Math.max(11,Math.round(petalR*0.38));
+    el.innerHTML=`${ringsHTML}<span class="petal-label" style="font-size:${fontSize}px">${showNames?ch.name+voiceTag:noteCount}</span>`;
     el.dataset.index=i;
 
     // Click
