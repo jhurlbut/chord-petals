@@ -605,16 +605,22 @@ function showKeyPopup(){
   popup.classList.toggle('show');
 }
 
-// Center click — play chord and show key selector
+// Center click — play chord only
 document.getElementById('center').addEventListener('click',(e)=>{
   e.stopPropagation();
   playChord(currentRoot,'major');
   sendMIDIChord(currentRoot,'major');
-  showKeyPopup();
   const el=document.getElementById('center');
   el.style.transform='translate(-50%,-50%) scale(1.08)';
   setTimeout(()=>el.style.transform='translate(-50%,-50%)',150);
 });
+// Long-press center to show key selector
+let centerLongPressT=null;
+document.getElementById('center').addEventListener('pointerdown',(e)=>{
+  centerLongPressT=setTimeout(()=>{showKeyPopup();centerLongPressT=null;},500);
+});
+document.getElementById('center').addEventListener('pointerup',()=>{if(centerLongPressT)clearTimeout(centerLongPressT);});
+document.getElementById('center').addEventListener('pointermove',()=>{if(centerLongPressT)clearTimeout(centerLongPressT);});
 // Long-press / double-tap center for key selector
 let centerTapTimer=null,centerTapCount=0;
 document.getElementById('center').addEventListener('pointerdown',(e)=>{
