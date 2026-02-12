@@ -94,7 +94,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:#32408C;border:none;
   z-index:10;cursor:pointer;transition:transform .15s,box-shadow .3s;
-  left:50%;top:50%;transform:translate(-50%,-50%);
+  transform:translate(-50%,-50%);
 }
 .center-chord:active{transform:translate(-50%,-50%) scale(0.93)}
 .center-chord .name{font-size:22px;font-weight:700;line-height:1}
@@ -856,7 +856,7 @@ function render(){
 
   const garden=document.getElementById('garden');
   const gw=_gardenW,gh=_gardenH;
-  const cx=gw/2, cy=gh/2;
+  let cx=gw/2, cy=gh/2;
   const scale=Math.min(gw,gh)/300;
   const centerR=Math.round(48*scale), petalR=Math.round(36*scale);
 
@@ -901,10 +901,23 @@ function render(){
   
   // Outermost petal distance for ring sizing
   let outerOrbitR=centerR+pR;
+  // Compute bounding box of all positions to center the cluster vertically
+  let minY=-centerR, maxY=centerR, minX=-centerR, maxX=centerR;
   for(const p of packPositions){
     const d=Math.sqrt(p.x*p.x+p.y*p.y);
     if(d>outerOrbitR)outerOrbitR=d;
+    minY=Math.min(minY,p.y-pR);maxY=Math.max(maxY,p.y+pR);
+    minX=Math.min(minX,p.x-pR);maxX=Math.max(maxX,p.x+pR);
   }
+  // Shift center so flower cluster is centered in garden
+  const clusterMidY=(minY+maxY)/2;
+  const clusterMidX=(minX+maxX)/2;
+  cy-=clusterMidY; // shift to vertically center
+  cx-=clusterMidX; // shift to horizontally center
+
+  // Position center element using adjusted cx/cy
+  cEl.style.left=cx+'px';cEl.style.top=cy+'px';
+
   const ring=document.getElementById('rotRing');
   const ringR=outerOrbitR+pR+14;
   ring.style.width=ring.style.height=(ringR*2)+'px';
