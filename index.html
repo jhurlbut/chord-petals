@@ -368,8 +368,16 @@ function getAudio(){
   }
   return audioCtx;
 }
-document.addEventListener('visibilitychange',()=>{if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();});
-document.addEventListener('touchstart',()=>{if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();},{once:false,passive:true});
+// Resume audio after tab switch — needs user gesture on iOS
+function resumeAudioCtx(){
+  if(audioCtx&&audioCtx.state==='suspended'){
+    audioCtx.resume().then(()=>{dismissMuteToast();}).catch(()=>{});
+  }
+}
+document.addEventListener('visibilitychange',resumeAudioCtx);
+['touchstart','touchend','click','pointerdown','pointerup'].forEach(evt=>{
+  document.addEventListener(evt,resumeAudioCtx,{passive:true});
+});
 
 // Mute indicator
 let muteToastEl=null;
