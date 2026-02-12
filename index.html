@@ -192,6 +192,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 }
 .midi-toggle input:checked+.sw::after{transform:translateX(15px)}
 .midi-note{font-size:10px;color:var(--text-dim);margin-top:6px;opacity:0.6}
+.voice-opt{flex:1;padding:6px 4px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:var(--text);font-size:11px;cursor:pointer;font-family:inherit}
+.voice-opt.active{background:rgba(242,80,110,0.25);border-color:rgba(242,80,110,0.5)}
 .midi-detected{font-size:10px;color:var(--min7);text-align:center;min-height:14px;padding:2px 0}
 </style>
 </head>
@@ -238,7 +240,27 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="tool-btn" onclick="copyChords()" title="Copy chords">📋</button>
     <button class="tool-btn active" id="soundBtn" onclick="toggleSound()" title="Sound">🔊</button>
     <button class="tool-btn" id="lockBtn" onclick="toggleLock()" title="Lock root">🔓</button>
+    <button class="tool-btn" id="voiceBtn" onclick="toggleVoicePanel()" title="Voicing">🎛</button>
     <button class="tool-btn" onclick="toggleMidiPanel()" title="MIDI">🎹</button>
+  </div>
+</div>
+
+<!-- Voicing Panel -->
+<div class="midi-panel" id="voicePanel">
+  <h3>🎛 Voicing & Phrasing</h3>
+  <label>Bass Root</label>
+  <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="bassRoot=this.checked"><span class="sw"></span>Play root in bass octave</label>
+  <label>Voicing</label>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
+    <button class="voice-opt active" data-voice="close" onclick="setVoiceMode('close')">Close</button>
+    <button class="voice-opt" data-voice="open" onclick="setVoiceMode('open')">Open</button>
+    <button class="voice-opt" data-voice="spread" onclick="setVoiceMode('spread')">Spread</button>
+  </div>
+  <label>Phrasing</label>
+  <div style="display:flex;gap:4px">
+    <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
+    <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
+    <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
   </div>
 </div>
 
@@ -474,7 +496,74 @@ function checkMuteState(){
   },100);
 }
 
+// Apply voicing mode to intervals
+function applyVoicing(intervals){
+  let v=[...intervals];
+  if(voicingMode==='open'&&v.length>=3){
+    // Raise middle notes up an octave
+    for(let i=1;i<v.length-1;i++) v[i]+=12;
+  }else if(voicingMode==='spread'&&v.length>=3){
+    // Spread across 2 octaves
+    v=v.map((n,i)=>n+Math.floor(i*24/(v.length-1||1))-Math.floor(i*12/(v.length-1||1)));
+  }
+  return v;
+}
+
+// Play a single note with the synth engine
+function playNote(ctx,freq,startTime,gain,duration){
+  const attack=0.02,decay=0.15,sustain=0.6,release=Math.min(1.0,duration*0.5);
+  const total=duration;
+  const vGain=ctx.createGain();
+  vGain.gain.setValueAtTime(0.001,startTime);
+  vGain.gain.linearRampToValueAtTime(gain,startTime+attack);
+  vGain.gain.linearRampToValueAtTime(gain*sustain,startTime+attack+decay);
+  vGain.gain.setValueAtTime(gain*sustain,startTime+total-release);
+  vGain.gain.exponentialRampToValueAtTime(0.001,startTime+total);
+  const filter=ctx.createBiquadFilter();filter.type='lowpass';
+  filter.frequency.setValueAtTime(2200,startTime);filter.frequency.exponentialRampToValueAtTime(800,startTime+total*0.7);filter.Q.value=1.5;
+  const saw1=ctx.createOscillator();saw1.type='sawtooth';saw1.frequency.value=freq;
+  const saw2=ctx.createOscillator();saw2.type='sawtooth';saw2.frequency.value=freq*1.005;
+  const saw3=ctx.createOscillator();saw3.type='sawtooth';saw3.frequency.value=freq*0.995;
+  const sub=ctx.createOscillator();sub.type='triangle';sub.frequency.value=freq/2;
+  const subGain=ctx.createGain();subGain.gain.value=0.3;
+  const m1=ctx.createGain();m1.gain.value=0.4;const m2=ctx.createGain();m2.gain.value=0.3;const m3=ctx.createGain();m3.gain.value=0.3;
+  saw1.connect(m1);saw2.connect(m2);saw3.connect(m3);sub.connect(subGain);
+  m1.connect(filter);m2.connect(filter);m3.connect(filter);subGain.connect(filter);
+  filter.connect(vGain);vGain.connect(masterGain);
+  saw1.start(startTime);saw1.stop(startTime+total+0.1);
+  saw2.start(startTime);saw2.stop(startTime+total+0.1);
+  saw3.start(startTime);saw3.stop(startTime+total+0.1);
+  sub.start(startTime);sub.stop(startTime+total+0.1);
+  activeVoices.push({gain:vGain,stop:(t)=>{[saw1,saw2,saw3,sub].forEach(o=>{try{o.stop(t)}catch(e){}})}});
+}
+
+function playChordNotes(rootNote,intervals){
+  if(!soundOn)return;
+  checkMuteState();
+  const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
+  const baseFreq=261.63*Math.pow(2,rootNote/12);
+  const voiced=applyVoicing(intervals);
+  const now=ctx.currentTime;
+  activeVoices.forEach(v=>{try{v.gain.gain.cancelScheduledValues(now);v.gain.gain.setValueAtTime(v.gain.gain.value,now);v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.05);v.stop(now+0.06);}catch(e){}});
+  activeVoices=[];
+  const allNotes=bassRoot?[-12,...voiced]:voiced;
+  const noteGain=0.12/allNotes.length;
+  const total=phraseMode==='arpeggio'?2.4:1.8;
+  allNotes.forEach((semi,i)=>{
+    const freq=baseFreq*Math.pow(2,semi/12);
+    const delay=phraseMode==='strum'?i*0.03:phraseMode==='arpeggio'?i*0.15:0;
+    const dur=phraseMode==='arpeggio'?total-delay:total;
+    playNote(ctx,freq,now+delay,noteGain,dur);
+  });
+}
+
 function playChord(rootNote,quality){
+  if(!soundOn)return;
+  const intervals=QUALITY[quality]?.intervals||[0,4,7];
+  playChordNotes(rootNote,intervals);
+}
+
+function _playChord_UNUSED(rootNote,quality){
   if(!soundOn)return;
   checkMuteState();
   const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
@@ -516,6 +605,10 @@ function playChord(rootNote,quality){
 
 // Play chord with explicit interval array
 function playChordIntervals(rootNote,intervals){
+  playChordNotes(rootNote,intervals);
+}
+
+function _playChordIntervals_UNUSED(rootNote,intervals){
   if(!soundOn)return;
   const ctx=getAudio();if(ctx.state==='suspended')ctx.resume();
   const baseFreq=261.63*Math.pow(2,rootNote/12);
@@ -562,6 +655,12 @@ let selectedPetal=-1;
 let showNames=true;
 let soundOn=true;
 let lockRoot=false;
+// Voicing & phrasing options
+let bassRoot=false;      // play root in bass octave
+let voicingMode='close'; // close, open, spread
+let phraseMode='block';  // block, strum, arpeggio
+const VOICING_MODES=['close','open','spread'];
+const PHRASE_MODES=['block','strum','arpeggio'];
 let petalCount=5; // default visible petals
 let globalRotation=0; // degrees offset from dragging outer ring
 let petalElements=[];
@@ -710,10 +809,11 @@ document.addEventListener('click',(e)=>{
 
 // Tap empty space in garden to add a petal
 function gardenEmptyTap(e){
-  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
-  // Don't add petal if we just closed the MIDI panel
+  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('#voicePanel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
+  // Don't add petal if we just closed a panel
   const midiPanel=document.getElementById('midiPanel');
-  if(midiPanel._justClosed){delete midiPanel._justClosed;return;}
+  const voicePanel=document.getElementById('voicePanel');
+  if(midiPanel._justClosed||voicePanel._justClosed){delete midiPanel._justClosed;delete voicePanel._justClosed;return;}
   addPetal();
 }
 document.getElementById('garden').addEventListener('click',gardenEmptyTap);
@@ -963,7 +1063,19 @@ function initDragSystem(){
 let midiAccess=null,midiOutPort=null,midiInPort=null;
 let midiActiveNotes=new Set(),midiHeldNotes=new Set(),midiNoteOffTimers={};
 
-function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open')}
+function toggleVoicePanel(){
+  document.getElementById('voicePanel').classList.toggle('open');
+  document.getElementById('midiPanel').classList.remove('open');
+}
+function setVoiceMode(m){
+  voicingMode=m;
+  document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
+}
+function setPhraseMode(m){
+  phraseMode=m;
+  document.querySelectorAll('[data-phrase]').forEach(b=>b.classList.toggle('active',b.dataset.phrase===m));
+}
+function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open');document.getElementById('voicePanel').classList.remove('open');}
 function closeMidiPanel(){
   const panel=document.getElementById('midiPanel');
   panel.classList.remove('open');
@@ -974,6 +1086,11 @@ document.addEventListener('pointerdown',(e)=>{
   const panel=document.getElementById('midiPanel');
   if(panel.classList.contains('open')&&!panel.contains(e.target)&&!e.target.closest('[onclick*="toggleMidiPanel"]')){
     closeMidiPanel();
+  }
+  const vPanel=document.getElementById('voicePanel');
+  if(vPanel.classList.contains('open')&&!vPanel.contains(e.target)&&!e.target.closest('[onclick*="toggleVoicePanel"]')){
+    vPanel.classList.remove('open');
+    vPanel._justClosed=true;setTimeout(()=>{delete vPanel._justClosed;},300);
   }
 });
 function buildMidiChannels(){const s=document.getElementById('midiCh');for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.textContent='Ch '+i;s.appendChild(o);}}
