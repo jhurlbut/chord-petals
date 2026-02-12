@@ -815,17 +815,16 @@ document.addEventListener('click',(e)=>{
 
 // Tap empty space in garden to add a petal
 function gardenEmptyTap(e){
-  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('#voicePanel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
+  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('#voicePanel')||e.target.closest('#debugPanel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
   // Don't add petal if we just closed a panel
   const midiPanel=document.getElementById('midiPanel');
   const voicePanel=document.getElementById('voicePanel');
   if(midiPanel._justClosed||voicePanel._justClosed){delete midiPanel._justClosed;delete voicePanel._justClosed;return;}
-  // Bottom half of garden: add sub-petal (voicing variant)
-  // Top half: do nothing (use +/- buttons for main petals)
+  // Top half: add main petal, Bottom half: add voicing sub-petal
   const garden=document.getElementById('garden');
   const rect=garden.getBoundingClientRect();
   const tapY=e.clientY-rect.top;
-  if(tapY<rect.height*0.5)return;
+  if(tapY<rect.height*0.5){addPetal();return;}
   addSubPetal();
 }
 document.getElementById('garden').addEventListener('click',gardenEmptyTap);
