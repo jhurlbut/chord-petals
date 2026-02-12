@@ -295,8 +295,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <input type="range" id="dbgOffset" min="0" max="1.0" step="0.25" value="0.50" style="width:100%" oninput="dbgRingOffset=+this.value;document.getElementById('dbgOffsetVal').textContent=this.value;render()">
   <label>Padding: <span id="dbgMinVal">3</span></label>
   <input type="range" id="dbgMin" min="0" max="20" step="1" value="3" style="width:100%" oninput="dbgMinGap=+this.value;document.getElementById('dbgMinVal').textContent=this.value;render()">
-  <label>Vertical center: <span id="dbgVCVal">0.53</span></label>
-  <input type="range" id="dbgVC" min="0.3" max="0.7" step="0.01" value="0.53" style="width:100%" oninput="dbgVertCenter=+this.value;document.getElementById('dbgVCVal').textContent=this.value;render()">
+  <label>Vertical center: <span id="dbgVCVal">0.38</span></label>
+  <input type="range" id="dbgVC" min="0.3" max="0.7" step="0.01" value="0.38" style="width:100%" oninput="dbgVertCenter=+this.value;document.getElementById('dbgVCVal').textContent=this.value;render()">
   <label>Petal size: <span id="dbgPSVal">0.90</span></label>
   <input type="range" id="dbgPS" min="0.4" max="1.5" step="0.05" value="0.90" style="width:100%" oninput="dbgPetalScale=+this.value;document.getElementById('dbgPSVal').textContent=this.value;render()">
 </div>
@@ -652,7 +652,7 @@ var dbgPetalScale=0.9;    // petal size multiplier
 var dbgSpread=0.55;       // orbit distance multiplier
 var dbgOverlap=0.24;      // petal overlap (0=none, 1=full)
 var dbgRingOffset=0.5;    // angle offset per ring (fraction of petal angle step)
-var dbgVertCenter=0.53;   // vertical center position (0-1)
+var dbgVertCenter=0.38;   // vertical center position (0-1)
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
