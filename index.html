@@ -987,7 +987,7 @@ function render(){
   }
   const subPetalScale=0.7;
   const subDiam=Math.round(petalR*2*subPetalScale);
-  const subOrbitR=orbitR1+petalR*1.2; // just outside inner ring, close to parents
+  const subOrbitR=orbitR1+petalR*0.9; // snug just outside inner ring
 
   subPetals.forEach((sp,si)=>{
     if(sp.parentIdx>=chords.length)return;
