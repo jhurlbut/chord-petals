@@ -1090,21 +1090,26 @@ function toggleVoicePanel(){
   document.getElementById('midiPanel').classList.remove('open');
 }
 function toggleBass(v){bassRoot=v;}
+function previewChord(){playChord(currentRoot,'major');}
 function setSynth(s){
   synthPreset=s;
   document.querySelectorAll('[data-synth]').forEach(b=>b.classList.toggle('active',b.dataset.synth===s));
+  previewChord();
 }
 function shiftOctave(dir){
   octaveShift=Math.max(-2,Math.min(2,octaveShift+dir));
   document.getElementById('octaveLabel').textContent=(octaveShift>0?'+':'')+octaveShift;
+  previewChord();
 }
 function setVoiceMode(m){
   voicingMode=m;
   document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
+  previewChord();
 }
 function setPhraseMode(m){
   phraseMode=m;
   document.querySelectorAll('[data-phrase]').forEach(b=>b.classList.toggle('active',b.dataset.phrase===m));
+  previewChord();
 }
 function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open');document.getElementById('voicePanel').classList.remove('open');}
 function closeMidiPanel(){
