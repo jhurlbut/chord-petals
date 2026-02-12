@@ -1093,10 +1093,12 @@ function initDragSystem(){
       dragTarget=petal;
       dragType=petal.dataset.subIndex!==undefined?'subpetal':'petal';
       petal._wasDragged=false;
+      petal._dragCaptured=false;
+      petal._pointerId=e.pointerId;
       const p=getPos(e);startX=p.x;startY=p.y;
-      petal.classList.add('dragging');
-      petal.setPointerCapture(e.pointerId);
-      e.preventDefault();
+      // Don't setPointerCapture or preventDefault here — 
+      // doing so on iOS suppresses the click event.
+      // We'll capture only once actual drag movement is detected.
     }else if(ring){
       dragType='ring';dragTarget=ring;
       const p=getPos(e);const r=gardenRect();
@@ -1113,7 +1115,16 @@ function initDragSystem(){
     const p=getPos(e);
     if(dragType==='petal'||dragType==='subpetal'){
       const dx=p.x-startX,dy=p.y-startY;
-      if(Math.abs(dx)+Math.abs(dy)>5)dragTarget._wasDragged=true;
+      if(Math.abs(dx)+Math.abs(dy)>5){
+        dragTarget._wasDragged=true;
+        // Capture pointer and start visual drag only once threshold exceeded
+        if(!dragTarget._dragCaptured){
+          dragTarget._dragCaptured=true;
+          dragTarget.classList.add('dragging');
+          try{dragTarget.setPointerCapture(dragTarget._pointerId);}catch(e){}
+        }
+      }
+      if(!dragTarget._wasDragged)return; // Don't move petal until drag threshold met
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
       const lx=p.x-r.left,ly=p.y-r.top;
