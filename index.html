@@ -829,26 +829,21 @@ function render(){
   cEl.style.width=(centerR*2)+'px';cEl.style.height=(centerR*2)+'px';
   document.getElementById('centerName').style.fontSize=Math.round(centerR*0.55)+'px';
   document.getElementById('centerSub').style.fontSize=Math.round(centerR*0.2)+'px';
-  const orbitR1=centerR+petalR-Math.round(8*scale); // inner orbit
-  const orbitGap=petalR*1.8; // gap between rings
-
-  // Determine how many rings we need and how to distribute petals
-  const maxPerRing=6; // max petals in inner ring
-  const numRings=Math.ceil(chords.length/maxPerRing);
+  // Sunflower spiral layout (Vogel's model)
+  // r(k) = c * sqrt(k), θ(k) = k * golden_angle
+  const goldenAngle=137.508*Math.PI/180; // ~2.39996 radians
+  const spiralC=(centerR+petalR*0.6); // spacing constant — first petal just outside center
   
-  // Build ring assignments: distribute petals across rings
-  const rings=[];
-  let remaining=chords.length;
-  for(let r=0;r<numRings;r++){
-    const capacity=r===0?Math.min(maxPerRing,remaining):Math.min(maxPerRing+r*2,remaining);
-    const count=Math.min(capacity,remaining);
-    rings.push(count);
-    remaining-=count;
-    if(remaining<=0)break;
+  // Compute spiral positions for each petal
+  const spiralPositions=[];
+  for(let k=0;k<chords.length;k++){
+    const r=spiralC*Math.sqrt(k+1); // k+1 so first petal isn't at center
+    const theta=(k+1)*goldenAngle+(globalRotation*Math.PI/180);
+    spiralPositions.push({r,theta});
   }
-
-  // Use outermost ring for rotation/delete ring sizing
-  const outerOrbitR=orbitR1+(rings.length-1)*orbitGap;
+  
+  // Outermost petal radius for ring sizing
+  const outerOrbitR=chords.length>0?spiralPositions[chords.length-1].r:centerR+petalR;
   const ring=document.getElementById('rotRing');
   const ringR=outerOrbitR+petalR+14;
   ring.style.width=ring.style.height=(ringR*2)+'px';
@@ -876,25 +871,12 @@ function render(){
   // Scale down petals when there are many
   const petalScale=chords.length>7?Math.max(0.6,1-(chords.length-7)*0.04):1;
   const pDiam=Math.round(petalR*2*petalScale);
-  // Pre-compute ring assignments for each petal
-  let petalRingMap=[]; // {ringIdx, angleIdx, ringCount, orbitR}
-  let idx=0;
-  for(let r=0;r<rings.length;r++){
-    const count=rings[r];
-    const orbitR=orbitR1+r*orbitGap;
-    const angleOffset=r*0.15; // slight rotation offset per ring for organic feel
-    for(let j=0;j<count;j++){
-      petalRingMap.push({ringIdx:r,angleIdx:j,ringCount:count,orbitR,angleOffset});
-      idx++;
-    }
-  }
 
   chords.forEach((ch,i)=>{
-    const rm=petalRingMap[i]||{ringIdx:0,angleIdx:i,ringCount:chords.length,orbitR:orbitR1,angleOffset:0};
-    const angle=(2*Math.PI*rm.angleIdx/rm.ringCount)-Math.PI/2+(globalRotation*Math.PI/180)+rm.angleOffset;
+    const sp=spiralPositions[i]||{r:spiralC,theta:0};
     const custom=petalCustomOffsets[i];
-    const px=custom?cx+custom.dx:cx+rm.orbitR*Math.cos(angle);
-    const py=custom?cy+custom.dy:cy+rm.orbitR*Math.sin(angle);
+    const px=custom?cx+custom.dx:cx+sp.r*Math.cos(sp.theta);
+    const py=custom?cy+custom.dy:cy+sp.r*Math.sin(sp.theta);
     const qi=QUALITY[ch.quality]||QUALITY.major;
     const voiceLevel=petalVoicings[i]||0;
 
@@ -987,18 +969,17 @@ function render(){
   }
   const subPetalScale=0.7;
   const subDiam=Math.round(petalR*2*subPetalScale);
-  const subOrbitR=orbitR1+petalR*0.9; // snug just outside inner ring
 
   subPetals.forEach((sp,si)=>{
     if(sp.parentIdx>=chords.length)return;
-    const parentRM=petalRingMap[sp.parentIdx];
-    if(!parentRM)return;
-    const parentAngle=(2*Math.PI*parentRM.angleIdx/parentRM.ringCount)-Math.PI/2+(globalRotation*Math.PI/180)+parentRM.angleOffset;
-    // Offset sub-petals slightly from parent angle based on voiceLevel
-    const angleOffset=(sp.voiceLevel-2)*0.18; // spread around parent
-    const angle=parentAngle+angleOffset;
-    const px=cx+subOrbitR*Math.cos(angle);
-    const py=cy+subOrbitR*Math.sin(angle);
+    const parentSpiral=spiralPositions[sp.parentIdx];
+    if(!parentSpiral)return;
+    // Place sub-petals just beyond the parent, offset by voice level
+    const angleOffset=(sp.voiceLevel-2)*0.25;
+    const subR=parentSpiral.r+petalR*1.1;
+    const angle=parentSpiral.theta+angleOffset;
+    const px=cx+subR*Math.cos(angle);
+    const py=cy+subR*Math.sin(angle);
     const parentChord=chords[sp.parentIdx];
     const qi=QUALITY[parentChord.quality]||QUALITY.major;
     // Desaturated version of parent color
