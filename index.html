@@ -617,6 +617,9 @@ let globalRotation=0; // degrees offset from dragging outer ring
 let petalElements=[];
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
+let subPetals=[]; // array of {parentIdx, voiceLevel} — voiceLevel: 1=7th, 2=9th, 3=11th
+let subPetalElements=[];
+let nextSubParent=0; // which inner petal gets the next sub-petal
 // Cached garden dimensions
 let _gardenW=360,_gardenH=360;
 function cacheGardenDims(){const g=document.getElementById('garden');_gardenW=g.clientWidth||360;_gardenH=g.clientHeight||360;}
@@ -640,7 +643,7 @@ function init(){
 function setMode(id){
   currentMode=id;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===id));
-  petalCustomOffsets={};
+  petalCustomOffsets={};subPetals=[];nextSubParent=0;
   render();
 }
 
@@ -649,7 +652,7 @@ function setRoot(noteIdx,name){
   history_stack.push({root:noteIdx,name});
   if(history_stack.length>12)history_stack=history_stack.slice(-12);
   currentRoot=noteIdx;
-  petalCustomOffsets={};
+  petalCustomOffsets={};subPetals=[];nextSubParent=0;
   selectedPetal=-1;
   render();
 }
@@ -690,8 +693,31 @@ function addPetal(){
 function removePetal(){
   petalCount=Math.max(3,petalCount-1);
   if(selectedPetal>=petalCount)selectedPetal=-1;
+  // Remove any sub-petals whose parent is gone
+  subPetals=subPetals.filter(sp=>sp.parentIdx<petalCount);
   document.getElementById('petalCountLabel').textContent=petalCount;
   render();
+}
+function addSubPetal(){
+  // Find the next inner petal that could use a voicing variant
+  // Cycle: 7th, 9th, 11th for each parent, then move to next parent
+  const maxVoice=3; // 1=7th, 2=9th, 3=11th
+  // Find next parent that doesn't have all 3 voicings yet
+  let tried=0;
+  while(tried<petalCount){
+    const parentIdx=nextSubParent%petalCount;
+    const existing=subPetals.filter(sp=>sp.parentIdx===parentIdx);
+    if(existing.length<maxVoice){
+      const nextLevel=existing.length+1; // 1=7th, 2=9th, 3=11th
+      subPetals.push({parentIdx,voiceLevel:nextLevel});
+      nextSubParent=(parentIdx+1)%petalCount;
+      render();
+      return;
+    }
+    nextSubParent=(parentIdx+1)%petalCount;
+    tried++;
+  }
+  // All parents have all voicings — do nothing
 }
 
 // Key selector popup
@@ -768,12 +794,13 @@ function gardenEmptyTap(e){
   const midiPanel=document.getElementById('midiPanel');
   const voicePanel=document.getElementById('voicePanel');
   if(midiPanel._justClosed||voicePanel._justClosed){delete midiPanel._justClosed;delete voicePanel._justClosed;return;}
-  // Only add petal if tapping bottom half of garden
+  // Bottom half of garden: add sub-petal (voicing variant)
+  // Top half: do nothing (use +/- buttons for main petals)
   const garden=document.getElementById('garden');
   const rect=garden.getBoundingClientRect();
   const tapY=e.clientY-rect.top;
   if(tapY<rect.height*0.5)return;
-  addPetal();
+  addSubPetal();
 }
 document.getElementById('garden').addEventListener('click',gardenEmptyTap);
 
@@ -946,6 +973,70 @@ function render(){
     }
   });
 
+  // ── Sub-petals (voicing variants in outer ring) ──
+  const subNeeded=subPetals.length;
+  while(subPetalElements.length>subNeeded){const el=subPetalElements.pop();el.remove();}
+  while(subPetalElements.length<subNeeded){
+    const el=document.createElement('div');
+    el.className='petal';
+    el.style.boxShadow='none';
+    garden.appendChild(el);
+    subPetalElements.push(el);
+  }
+  const subPetalScale=0.7;
+  const subDiam=Math.round(petalR*2*subPetalScale);
+  const subOrbitR=orbitR1+orbitGap*1.1; // outer ring
+
+  subPetals.forEach((sp,si)=>{
+    if(sp.parentIdx>=chords.length)return;
+    const parentRM=petalRingMap[sp.parentIdx];
+    if(!parentRM)return;
+    const parentAngle=(2*Math.PI*parentRM.angleIdx/parentRM.ringCount)-Math.PI/2+(globalRotation*Math.PI/180)+parentRM.angleOffset;
+    // Offset sub-petals slightly from parent angle based on voiceLevel
+    const angleOffset=(sp.voiceLevel-2)*0.18; // spread around parent
+    const angle=parentAngle+angleOffset;
+    const px=cx+subOrbitR*Math.cos(angle);
+    const py=cy+subOrbitR*Math.sin(angle);
+    const parentChord=chords[sp.parentIdx];
+    const qi=QUALITY[parentChord.quality]||QUALITY.major;
+    // Desaturated version of parent color
+    const solidColor=qi.solid;
+    const desat=desatColor(solidColor,0.5,0.45);
+
+    const el=subPetalElements[si];
+    el.style.transform=`translate(${px-subDiam/2}px,${py-subDiam/2}px)`;
+    el.style.width=subDiam+'px';el.style.height=subDiam+'px';
+    el.style.left='0';el.style.top='0';
+    el.style.background=desat;
+    el.style.opacity='0.85';
+    el.dataset.subIndex=si;
+    el._subData={sp,parentChord,si};
+
+    const voiceLabel=VOICING_LABELS[sp.voiceLevel]||'';
+    const fontSize=Math.max(8,Math.round(petalR*0.3*subPetalScale));
+    const newHTML=`<span class="petal-label" style="font-size:${fontSize}px">${showNames?parentChord.name+voiceLabel:voiceLabel}</span>`;
+    if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
+
+    if(!el._eventsAttached){
+      el._eventsAttached=true;
+      el.addEventListener('click',(e)=>{
+        if(el._wasDragged)return;
+        e.stopPropagation();
+        const{sp:s,parentChord:pc}=el._subData;
+        const ext=VOICING_EXTENSIONS[pc.quality];
+        if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
+        else playChord(pc.root,pc.quality);
+        sendMIDIChord(pc.root,pc.quality);
+        // Spring animation
+        const baseT=el.style.transform.replace(/ scale\([^)]*\)/g,'');
+        el.style.transition='transform 0.1s ease-out';
+        el.style.transform=baseT+' scale(0.85)';
+        setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT+' scale(1.06)';},100);
+        setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform=baseT;},350);
+      });
+    }
+  });
+
   // History
   const hEl=document.getElementById('history');
   hEl.innerHTML='';
@@ -968,14 +1059,15 @@ function initDragSystem(){
   function getPos(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
   function gardenRect(){return garden.getBoundingClientRect();}
 
-  // Petal drag
+  // Petal drag (main + sub-petals)
   garden.addEventListener('pointerdown',(e)=>{
     // Don't intercept +/- buttons
     if(e.target.closest('.petal-count'))return;
     const petal=e.target.closest('.petal');
     const ring=e.target.closest('.rotation-ring');
     if(petal){
-      dragTarget=petal;dragType='petal';
+      dragTarget=petal;
+      dragType=petal.dataset.subIndex!==undefined?'subpetal':'petal';
       petal._wasDragged=false;
       const p=getPos(e);startX=p.x;startY=p.y;
       petal.classList.add('dragging');
@@ -995,18 +1087,19 @@ function initDragSystem(){
     if(!dragTarget)return;
     e.preventDefault();
     const p=getPos(e);
-    if(dragType==='petal'){
+    if(dragType==='petal'||dragType==='subpetal'){
       const dx=p.x-startX,dy=p.y-startY;
       if(Math.abs(dx)+Math.abs(dy)>5)dragTarget._wasDragged=true;
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
-      const rect=r;
-      const lx=p.x-rect.left,ly=p.y-rect.top;
-      const petalR=parseFloat(dragTarget.style.width)/2;
-      dragTarget.style.transform=`translate(${lx-petalR}px,${ly-petalR}px)`;
+      const lx=p.x-r.left,ly=p.y-r.top;
+      const halfW=parseFloat(dragTarget.style.width)/2;
+      dragTarget.style.transform=`translate(${lx-halfW}px,${ly-halfW}px)`;
       dragTarget.style.transition='width .1s,height .1s,box-shadow .1s';
-      const idx=parseInt(dragTarget.dataset.index);
-      petalCustomOffsets[idx]={dx:lx-cx,dy:ly-cy};
+      if(dragType==='petal'){
+        const idx=parseInt(dragTarget.dataset.index);
+        petalCustomOffsets[idx]={dx:lx-cx,dy:ly-cy};
+      }
       // Show delete ring and check if outside
       const delRing=document.getElementById('deleteRing');
       const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
@@ -1026,7 +1119,7 @@ function initDragSystem(){
   garden.addEventListener('pointerup',(e)=>{
     const delRing=document.getElementById('deleteRing');
     delRing.classList.remove('active','danger');
-    if(dragTarget&&dragType==='petal'){
+    if(dragTarget&&(dragType==='petal'||dragType==='subpetal')){
       dragTarget.classList.remove('dragging');
       dragTarget.style.transition='';
       dragTarget.style.opacity='1';
@@ -1037,15 +1130,26 @@ function initDragSystem(){
       const lx=p.x-r.left,ly=p.y-r.top;
       const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
       const ringR=parseFloat(delRing.style.width)/2;
-      if(dragTarget._wasDragged&&dist>ringR&&petalCount>3){
-        const idx=parseInt(dragTarget.dataset.index);
-        delete petalCustomOffsets[idx];
-        petalCount=Math.max(3,petalCount-1);
-        render();
+      if(dragTarget._wasDragged&&dist>ringR){
+        if(dragType==='subpetal'){
+          const si=parseInt(dragTarget.dataset.subIndex);
+          subPetals.splice(si,1);
+          render();
+        }else if(petalCount>3){
+          const idx=parseInt(dragTarget.dataset.index);
+          delete petalCustomOffsets[idx];
+          // Also remove sub-petals for this parent and shift indices
+          subPetals=subPetals.filter(sp=>sp.parentIdx!==idx).map(sp=>({...sp,parentIdx:sp.parentIdx>idx?sp.parentIdx-1:sp.parentIdx}));
+          petalCount=Math.max(3,petalCount-1);
+          document.getElementById('petalCountLabel').textContent=petalCount;
+          render();
+        }
       }else{
-        // Snap back if not deleted
-        const idx=parseInt(dragTarget.dataset.index);
-        if(dragTarget._wasDragged){delete petalCustomOffsets[idx];render();}
+        if(dragType==='petal'){
+          const idx=parseInt(dragTarget.dataset.index);
+          if(dragTarget._wasDragged){delete petalCustomOffsets[idx];}
+        }
+        render();
       }
     }
     dragTarget=null;dragType=null;
