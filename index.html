@@ -7,8 +7,8 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#0f0f1a;--panel:#1a1a2e;--surface:rgba(255,255,255,0.06);--text:#e8e8f0;--text-dim:#7778a0;
-  --major:#e84057;--minor:#2ec4b6;--dim:#6b6b80;--aug:#f0c928;--dom7:#f08c28;--halfdim:#7c5ce7;--maj7:#e84080;--min7:#00c9c4;
+  --bg:#B0D4F1;--panel:#87CEEB;--surface:rgba(255,255,255,0.2);--text:#2E2E2E;--text-dim:#5D8A3C;
+  --major:#F4A68C;--minor:#4CAF50;--dim:#7A5A2E;--aug:#FFEB3B;--dom7:#E8836B;--halfdim:#A67C3D;--maj7:#E8A0C0;--min7:#8BC34A;
 }
 html,body{height:100%;overflow:hidden;font-family:'SF Pro Display',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);
   user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;
@@ -49,7 +49,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   background:transparent;color:var(--text-dim);font-size:11px;font-weight:500;
   cursor:pointer;transition:all .2s;white-space:nowrap;
 }
-.mode-btn.active{background:rgba(232,64,87,0.2);border-color:rgba(232,64,87,0.4);color:#e84057}
+.mode-btn.active{background:rgba(244,166,140,0.2);border-color:rgba(244,166,140,0.4);color:#F4A68C}
 
 /* ── History ── */
 .history{
@@ -76,19 +76,19 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
 /* Delete zone ring — appears when dragging a petal */
 .delete-ring{
-  position:absolute;border-radius:50%;border:2px dashed rgba(232,64,87,0.0);
+  position:absolute;border-radius:50%;border:2px dashed rgba(244,166,140,0.0);
   pointer-events:none;transition:border-color .2s, box-shadow .2s;
   z-index:1;
 }
-.delete-ring.active{border-color:rgba(232,64,87,0.7);box-shadow:0 0 20px rgba(232,64,87,0.15)}
-.delete-ring.danger{border-color:rgba(232,64,87,1);box-shadow:0 0 30px rgba(232,64,87,0.3);animation:pulse-ring .6s ease infinite alternate}
-@keyframes pulse-ring{from{border-color:rgba(232,64,87,0.7)}to{border-color:rgba(232,64,87,1)}}
+.delete-ring.active{border-color:rgba(244,166,140,0.7);box-shadow:0 0 20px rgba(244,166,140,0.15)}
+.delete-ring.danger{border-color:rgba(244,166,140,1);box-shadow:0 0 30px rgba(244,166,140,0.3);animation:pulse-ring .6s ease infinite alternate}
+@keyframes pulse-ring{from{border-color:rgba(244,166,140,0.7)}to{border-color:rgba(244,166,140,1)}}
 
 /* Center chord */
 .center-chord{
   position:absolute;width:76px;height:76px;border-radius:50%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:#1e1e36;border:2.5px solid rgba(255,255,255,0.15);
+  background:#D4A056;border:2.5px solid rgba(122,90,46,0.4);
   z-index:10;cursor:pointer;transition:transform .15s,box-shadow .3s;
   left:50%;top:50%;transform:translate(-50%,-50%);
 }
@@ -158,8 +158,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   background:rgba(255,255,255,0.06);color:var(--text);font-size:13px;font-weight:600;
   cursor:pointer;transition:all .15s;
 }
-.key-popup button:hover{background:rgba(232,64,87,0.25);border-color:rgba(232,64,87,0.5)}
-.key-popup button.current{background:rgba(232,64,87,0.3);border-color:rgba(232,64,87,0.6)}
+.key-popup button:hover{background:rgba(244,166,140,0.25);border-color:rgba(244,166,140,0.5)}
+.key-popup button.current{background:rgba(244,166,140,0.3);border-color:rgba(244,166,140,0.6)}
 
 /* ── MIDI Panel ── */
 .midi-panel{
@@ -182,7 +182,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 .midi-toggle .sw{
   width:32px;height:17px;border-radius:9px;background:rgba(255,255,255,0.1);position:relative;transition:background .2s;
 }
-.midi-toggle input:checked+.sw{background:rgba(232,64,87,0.5)}
+.midi-toggle input:checked+.sw{background:rgba(244,166,140,0.5)}
 .midi-toggle .sw::after{
   content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
   background:#fff;transition:transform .2s;
@@ -264,14 +264,14 @@ const MAJOR_SCALE = [0,2,4,5,7,9,11];
 const MINOR_SCALE = [0,2,3,5,7,8,10];
 
 const QUALITY = {
-  major:{intervals:[0,4,7],color:'var(--major)',solid:'#e84057'},
-  minor:{intervals:[0,3,7],color:'var(--minor)',solid:'#2ec4b6'},
-  dim:{intervals:[0,3,6],color:'var(--dim)',solid:'#6b6b80'},
-  aug:{intervals:[0,4,8],color:'var(--aug)',solid:'#f0c928'},
-  dom7:{intervals:[0,4,7,10],color:'var(--dom7)',solid:'#f08c28'},
-  maj7:{intervals:[0,4,7,11],color:'var(--maj7)',solid:'#e84080'},
-  min7:{intervals:[0,3,7,10],color:'var(--min7)',solid:'#00c9c4'},
-  halfdim:{intervals:[0,3,6,10],color:'var(--halfdim)',solid:'#7c5ce7'},
+  major:{intervals:[0,4,7],color:'var(--major)',solid:'#F4A68C'},
+  minor:{intervals:[0,3,7],color:'var(--minor)',solid:'#4CAF50'},
+  dim:{intervals:[0,3,6],color:'var(--dim)',solid:'#7A5A2E'},
+  aug:{intervals:[0,4,8],color:'var(--aug)',solid:'#FFEB3B'},
+  dom7:{intervals:[0,4,7,10],color:'var(--dom7)',solid:'#E8836B'},
+  maj7:{intervals:[0,4,7,11],color:'var(--maj7)',solid:'#E8A0C0'},
+  min7:{intervals:[0,3,7,10],color:'var(--min7)',solid:'#8BC34A'},
+  halfdim:{intervals:[0,3,6,10],color:'var(--halfdim)',solid:'#A67C3D'},
 };
 
 // Voicing extensions: each ring level adds notes
