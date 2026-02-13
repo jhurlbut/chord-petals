@@ -322,10 +322,10 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" onclick="setImprovSteps(32);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">2 bars</button>
     <button class="voice-opt active" onclick="setImprovSteps(64);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">4 bars</button>
   </div>
-  <label>Creativity: <span id="improvTempVal" style="color:var(--text)">Conservative</span></label>
+  <label>Creativity: <span id="improvTempVal" style="color:var(--text)">Gentle</span></label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
-    <button class="voice-opt active" onclick="setImprovTemp(0.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Safe</button>
-    <button class="voice-opt" onclick="setImprovTemp(0.8);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Gentle</button>
+    <button class="voice-opt" onclick="setImprovTemp(0.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Safe</button>
+    <button class="voice-opt active" onclick="setImprovTemp(0.8);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Gentle</button>
     <button class="voice-opt" onclick="setImprovTemp(1.1);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Balanced</button>
     <button class="voice-opt" onclick="setImprovTemp(1.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Wild</button>
     <button class="voice-opt" onclick="setImprovTemp(2.0);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Chaos</button>
@@ -781,7 +781,7 @@ let improvTimers=[];
 // Improv settings
 let improvTempo=140;
 let improvSteps=64;
-let improvTemperature=0.5;
+let improvTemperature=0.8;
 let improvGain=0.03;
 let improvOctave=-1;
 let improvModel='vae'; // 'rnn' or 'vae'
@@ -865,8 +865,8 @@ function setImprovModel(m){
   improvModel=m;
   document.querySelectorAll('[data-improv-model]').forEach(b=>b.classList.toggle('active',b.dataset.improvModel===m));
   if(improvEnabled)getImprovModel();
-  // Show/hide VAE-only options
-  document.getElementById('improvContinuousRow').style.display=m==='vae'?'':'none';
+  // Reset last sequence when switching models
+  _lastGeneratedSeq=null;
 }
 function setImprovContinuous(v){
   improvContinuous=v;
@@ -1005,34 +1005,43 @@ function playImprovSequence(result, onEnd){
   scheduleSequence(result, ctx.currentTime, onEnd);
 }
 
-// Generate a VAE sequence, interpolating from previous if available
-async function generateVAESequence(model, chordSym, temperature){
-  const chordProg=[chordSym,chordSym];
-  const controlArgs={chordProgression:chordProg};
-  
-  // If we have a previous sequence AND the chord changed, interpolate
-  if(_lastVAESequence && _lastChordSym && _lastChordSym!==chordSym){
-    try{
-      // Sample a new target for the new chord
-      const targets=await model.sample(1, temperature, controlArgs);
-      const target=targets[0];
-      // Interpolate from old to new (4 steps, take the middle ones for smooth transition)
-      const interps=await model.interpolate([_lastVAESequence, target], 4, temperature, controlArgs);
-      // Use step 2 (smooth blend toward new chord)
-      const blended=interps[2]||interps[1]||target;
-      _lastVAESequence=target; // store the pure target for next interpolation
-      _lastChordSym=chordSym;
-      return blended;
-    }catch(e){
-      console.warn('Interpolation failed, falling back to sample:',e);
+// Generate an improv sequence using whichever model is selected
+let _lastGeneratedSeq=null; // last output for seeding next RNN phrase
+
+async function generateImprovSequence(model, chordSym, temperature, rootIdx, quality){
+  if(improvModel==='vae'){
+    // MusicVAE mel_chords: always generates 2 bars (32 steps)
+    // Just sample cleanly — chord conditioning does the work
+    const controlArgs={chordProgression:[chordSym,chordSym]};
+    const samples=await model.sample(1, temperature, controlArgs);
+    _lastGeneratedSeq=samples[0];
+    return samples[0];
+  }else{
+    // MusicRNN: use end of last phrase as seed for continuity, or create fresh seed
+    let seed;
+    if(_lastGeneratedSeq&&_lastGeneratedSeq.notes&&_lastGeneratedSeq.notes.length>=4){
+      // Take last 4 notes of previous phrase as seed
+      const lastNotes=_lastGeneratedSeq.notes.slice(-4);
+      const minStep=lastNotes[0].quantizedStartStep;
+      const reseeded={
+        notes:lastNotes.map((n,i)=>({
+          pitch:n.pitch,
+          quantizedStartStep:i,
+          quantizedEndStep:i+1,
+        })),
+        quantizationInfo:{stepsPerQuarter:4},
+        totalQuantizedSteps:lastNotes.length,
+      };
+      seed=reseeded;
+    }else{
+      seed=makeSeedSequence(rootIdx,quality);
     }
+    const stepsToGen=improvSteps;
+    const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
+    const result=await model.continueSequence(seed, stepsToGen, temperature, chordProg);
+    _lastGeneratedSeq=result;
+    return result;
   }
-  
-  // Fresh sample (first time or same chord)
-  const samples=await model.sample(1, temperature, controlArgs);
-  _lastVAESequence=samples[0];
-  _lastChordSym=chordSym;
-  return samples[0];
 }
 
 // Continuous loop for VAE — pre-generates next phrase during current playback
@@ -1047,7 +1056,7 @@ async function pregenNextPhrase(){
     if(!model||!improvPlaying||!improvContinuous){_pregenInProgress=false;return;}
     const{rootIdx,quality}=_continuousChord;
     const chordSym=chordToMagentaSymbol(rootIdx,quality);
-    _nextPhraseReady=await generateVAESequence(model, chordSym, improvTemperature);
+    _nextPhraseReady=await generateImprovSequence(model, chordSym, improvTemperature, rootIdx, quality);
   }catch(e){
     console.warn('Pre-gen failed:',e);
     _nextPhraseReady=null;
@@ -1064,11 +1073,11 @@ async function continuousLoop(){
   if(!result){
     // No pre-generated phrase ready, generate now
     const model=await getImprovModel();
-    if(!model||improvModel!=='vae'){improvPlaying=false;return;}
+    if(!model){improvPlaying=false;return;}
     const{rootIdx,quality}=_continuousChord;
     const chordSym=chordToMagentaSymbol(rootIdx,quality);
     try{
-      result=await generateVAESequence(model, chordSym, improvTemperature);
+      result=await generateImprovSequence(model, chordSym, improvTemperature, rootIdx, quality);
     }catch(e){
       console.error('Continuous loop failed:',e);
       improvPlaying=false;return;
@@ -1099,20 +1108,13 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
   improvPlaying=true;
   _continuousChord={rootIdx,quality};
   const chordSym=chordToMagentaSymbol(rootIdx,quality);
-  const seed=makeSeedSequence(rootIdx,quality);
   
   try{
     let result;
     const temperature=improvTemperature;
     showImprovLoading(true,'Generating melody…');
     
-    if(improvModel==='vae'){
-      result=await generateVAESequence(model, chordSym, temperature);
-    }else{
-      const stepsToGen=improvSteps;
-      const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
-      result=await model.continueSequence(seed, stepsToGen, temperature, chordProg);
-    }
+    result=await generateImprovSequence(model, chordSym, temperature, rootIdx, quality);
     showImprovLoading(false);
     
     if(!improvPlaying){if(playChordFn)playChordFn();return;}
@@ -1120,13 +1122,14 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
     // Play chord and improv at the same instant
     if(playChordFn)playChordFn();
     
-    // Clear any pre-generated phrase (chord changed)
+    // Clear pre-gen and reset seed on chord change
     _nextPhraseReady=null;
+    _lastGeneratedSeq=null;
     
     const ctx=getAudio();
     const startTime=ctx?ctx.currentTime:0;
     scheduleSequence(result, startTime, ()=>{
-      if(improvContinuous&&improvModel==='vae'&&improvPlaying){
+      if(improvContinuous&&improvPlaying){
         continuousLoop();
       }else{
         improvPlaying=false;
@@ -1134,7 +1137,7 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
     });
     
     // Pre-generate next phrase while this one plays
-    if(improvContinuous&&improvModel==='vae')pregenNextPhrase();
+    if(improvContinuous)pregenNextPhrase();
   }catch(e){
     console.error('Improv generation failed:',e);
     improvPlaying=false;
