@@ -833,11 +833,11 @@ function makeSeedSequence(rootIdx, quality){
 }
 
 // Generate and play an improvisation over a chord
-async function improviseOverChord(rootIdx, quality){
+async function improviseOverChord(rootIdx, quality, playChordFn){
   if(!improvEnabled||!soundOn)return;
   stopImprov();
   const rnn=await initImprovRNN();
-  if(!rnn)return;
+  if(!rnn){if(playChordFn)playChordFn();return;}
   
   improvPlaying=true;
   const chordSym=chordToMagentaSymbol(rootIdx,quality);
@@ -846,17 +846,18 @@ async function improviseOverChord(rootIdx, quality){
   try{
     const stepsToGen=improvSteps;
     const temperature=improvTemperature;
-    // Chord progression: one chord symbol per bar (16 steps at 4 steps/quarter in 4/4)
     const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
     
     const result=await rnn.continueSequence(seed, stepsToGen, temperature, chordProg);
-    if(!improvPlaying)return;
+    if(!improvPlaying){if(playChordFn)playChordFn();return;}
     
-    // Play the generated melody through our synth — softer and shifted
+    // Play chord and improv at the same instant
+    if(playChordFn)playChordFn();
+    
     const ctx=getAudio();
     if(!ctx)return;
     const bpm=improvTempo;
-    const stepDur=60/(bpm*4); // 16th note at chosen tempo
+    const stepDur=60/(bpm*4);
     
     result.notes.forEach(note=>{
       if(!improvPlaying)return;
@@ -1329,10 +1330,14 @@ function render(){
         // Send MIDI immediately (don't wait for audio)
         sendMIDIChord(c.root,c.quality);
         const ext=VOICING_EXTENSIONS[c.quality];
-        if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
-        else playChord(c.root,c.quality);
-        // AI improvisation over tapped chord
-        if(improvEnabled)improviseOverChord(c.root,c.quality);
+        if(improvEnabled){
+          // Generate improv first, then play chord + improv simultaneously
+          const intervals=ext&&ext[vl]?ext[vl]:(QUALITY[c.quality]?.intervals||[0,4,7]);
+          improviseOverChord(c.root,c.quality,()=>playChordNotes(c.root,intervals));
+        } else {
+          if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
+          else playChord(c.root,c.quality);
+        }
         // Spring animation
         const bp=el._basePos||{x:0,y:0};
         const baseT=`translate(${bp.x}px,${bp.y}px)`;
