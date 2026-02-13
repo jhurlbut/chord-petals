@@ -670,8 +670,13 @@ async function initSuperSonic(){
     await Promise.race([sonic.sync(), mkTimeout(10000)]);
     sonicReady=true;
     sonicLoading=false;
-    console.log('SuperSonic: ready!');
-    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
+    // Resume SuperSonic's internal AudioContext (may be suspended on iOS)
+    if(sonic.node&&sonic.node.context&&sonic.node.context.state==='suspended'){
+      sonic.node.context.resume().catch(()=>{});
+    }
+    console.log('SuperSonic: ready! ctx state:',sonic.node?.context?.state);
+    const ssCtxState=sonic.node?.context?.state||'?';
+    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';badge.title='ctx:'+ssCtxState;}
   }catch(e){
     const errMsg=(e.message||String(e)).slice(0,60);
     console.warn('SuperSonic failed:',e);
@@ -781,6 +786,8 @@ function cleanupExpiredVoices(){
 function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
   // ── SuperSonic path ──
   if(sonicReady&&sonic){
+    // Ensure SuperSonic's AudioContext is running (iOS suspends it)
+    if(sonic.node?.context?.state==='suspended') sonic.node.context.resume().catch(()=>{});
     const usedPreset=presetOverride||synthPreset;
     const synthName=SONIC_SYNTH_MAP[usedPreset]||'sonic-pi-prophet';
     const midiNote=freqToMidi(freq);
