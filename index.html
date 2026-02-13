@@ -686,7 +686,16 @@ async function initSuperSonic(){
     document.body.appendChild(diag);
     setTimeout(()=>diag.remove(),10000);
     const ssCtxState=sonic.node?.context?.state||'?';
-    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';badge.title='ctx:'+ssCtxState;}
+    if(badge){
+      badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';badge.title='ctx:'+ssCtxState;
+      badge.style.cursor='pointer';
+      badge.addEventListener('click',()=>{
+        window._useWebAudio=!window._useWebAudio;
+        badge.textContent=window._useWebAudio?'🔊 Web Audio':'⚡ SuperSonic';
+        badge.style.background=window._useWebAudio?'rgba(242,80,110,0.2)':'rgba(61,173,217,0.2)';
+        badge.style.color=window._useWebAudio?'#F2506E':'#3DADD9';
+      });
+    }
   }catch(e){
     const errMsg=(e.message||String(e)).slice(0,60);
     const failedAt=badge?badge.textContent:'?';
@@ -796,7 +805,7 @@ function cleanupExpiredVoices(){
 // Play a single note with the synth engine
 function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
   // ── SuperSonic path ──
-  if(sonicReady&&sonic){
+  if(sonicReady&&sonic&&!window._useWebAudio){
     // Ensure SuperSonic's AudioContext is running (iOS suspends it)
     if(sonic.node?.context?.state==='suspended') sonic.node.context.resume().catch(()=>{});
     const usedPreset=presetOverride||synthPreset;
@@ -932,7 +941,7 @@ function playChordNotes(rootNote,intervals){
   // Play bass root note separately
   if(bassRoot){
     const bassFreq=baseFreq*Math.pow(2,-24/12); // 2 octaves down
-    if(sonicReady&&sonic){
+    if(sonicReady&&sonic&&!window._useWebAudio){
       const bassMidi=freqToMidi(bassFreq);
       const bassDur=total+0.5;
       sonic.send('/s_new',SONIC_SYNTH_MAP[synthPreset]||'sonic-pi-prophet',-1,0,0,
