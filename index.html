@@ -630,6 +630,13 @@ async function initSuperSonic(){
     if(badge){badge.textContent='Web Audio';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
     return;
   }
+  // SuperSonic WASM requires SharedArrayBuffer (even in postMessage mode)
+  if(typeof SharedArrayBuffer==='undefined'){
+    console.warn('SuperSonic: SharedArrayBuffer not available (needs COOP/COEP headers)');
+    sonicLoading=false;
+    if(badge){badge.textContent='Web Audio';badge.title='SuperSonic needs SharedArrayBuffer (requires server COOP/COEP headers)';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
+    return;
+  }
   
   const mkTimeout=(ms)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms));
   
