@@ -610,6 +610,11 @@ function chord(root,quality,numeral=''){
 // HARMONY MODES
 // ═══════════════════════════════════════════
 const MODES = [
+  {id:'chromediant',label:'Chromatic Mediants',fn:getChromaticMediants},
+  {id:'andalusian',label:'Andalusian',fn:getAndalusian},
+  {id:'borrowed',label:'Borrowed Chords',fn:getBorrowedChords},
+  {id:'parallel',label:'Chord Planing',fn:getChordPlaning},
+  {id:'secondary',label:'Secondary Doms',fn:getSecondaryDominants},
   {id:'diatonic',label:'Diatonic',fn:getDiatonic},
   {id:'fifths',label:'Circle of 5ths',fn:getCircleOfFifths},
   {id:'relative',label:'Relative/Parallel',fn:getRelativeParallel},
@@ -635,6 +640,70 @@ const SCALE_NUMS={
   diminished:['i°','ii°','iii°','iv°','v°','vi°','vii°','viii°'],
   lydian:['I','II','iii','#iv°','V','vi','vii'],
 };
+// ── Chromatic Mediants: move by major/minor thirds ──
+function getChromaticMediants(root){
+  return [
+    chord(root,'major','I'),
+    chord((root+4)%12,'major','III (up M3)'),
+    chord((root+8)%12,'major','♯V (up m3)'),
+    chord((root+3)%12,'major','♭III (dn M3)'),
+    chord((root+9)%12,'minor','vi (rel)'),
+    chord((root+8)%12,'minor','♭vi (dn M3 min)'),
+    chord((root+4)%12,'minor','iii (up M3 min)'),
+  ];
+}
+
+// ── Andalusian Cadence: i → ♭VII → ♭VI → V ──
+function getAndalusian(root){
+  return [
+    chord(root,'minor','i'),
+    chord((root+10)%12,'major','♭VII'),
+    chord((root+8)%12,'major','♭VI'),
+    chord((root+7)%12,'dom7','V7'),
+    chord((root+5)%12,'major','♭VI/♭VII'),
+    chord((root+3)%12,'major','♭III'),
+  ];
+}
+
+// ── Borrowed / Modal Mixture Chords ──
+function getBorrowedChords(root){
+  return [
+    chord(root,'major','I'),
+    chord((root+10)%12,'major','♭VII (mix)'),
+    chord((root+5)%12,'major','IV'),
+    chord((root+5)%12,'minor','iv (aeol)'),
+    chord((root+8)%12,'major','♭VI (aeol)'),
+    chord((root+3)%12,'major','♭III (dorian)'),
+    chord((root+1)%12,'major','♭II (phryg)'),
+  ];
+}
+
+// ── Chord Planing / Parallelism: same shape up chromatic or whole-tone steps ──
+function getChordPlaning(root){
+  return [
+    chord(root,'min7','im7'),
+    chord((root+2)%12,'min7','iim7 (+2)'),
+    chord((root+4)%12,'min7','iiim7 (+4)'),
+    chord(root,'maj7','Imaj7'),
+    chord((root+2)%12,'maj7','IImaj7 (+2)'),
+    chord((root+4)%12,'maj7','IIImaj7 (+4)'),
+    chord((root+1)%12,'min7','♭iim7 (+1)'),
+  ];
+}
+
+// ── Secondary Dominants & Augmented 6ths ──
+function getSecondaryDominants(root){
+  return [
+    chord(root,'major','I'),
+    chord((root+9)%12,'dom7','V7/ii'),
+    chord((root+11)%12,'dom7','V7/iii'),
+    chord((root+0)%12,'dom7','V7/IV'),
+    chord((root+2)%12,'dom7','V7/V'),
+    chord((root+4)%12,'dom7','V7/vi'),
+    chord((root+8)%12,'dom7','It+6'),
+  ];
+}
+
 function getDiatonic(root){
   const sc=currentScale||'major';
   const intervals=SCALE_INTERVALS[sc]||SCALE_INTERVALS.major;
