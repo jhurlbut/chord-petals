@@ -614,29 +614,39 @@ async function initSuperSonic(){
   const badge=document.getElementById('engineBadge');
   if(badge){badge.textContent='⏳ Loading…';badge.style.color='var(--text-dim)';}
   
-  // Timeout: if SuperSonic doesn't load in 15s, give up
-  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('SuperSonic load timeout (15s)')),15000));
+  // Check for required browser features first
+  if(!window.AudioWorklet && !(window.AudioContext && AudioContext.prototype.audioWorklet)){
+    console.warn('SuperSonic: AudioWorklet not supported');
+    sonicLoading=false;
+    if(badge){badge.textContent='Web Audio';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
+    return;
+  }
+  
+  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),12000));
   
   try{
-    const loadPromise=(async()=>{
-      const mod=await import('https://unpkg.com/supersonic-scsynth@latest');
-      const SuperSonic=mod.SuperSonic;
-      sonic=new SuperSonic({
-        baseURL:'https://unpkg.com/supersonic-scsynth@latest/dist/',
-        synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
-      });
-      await sonic.init();
-      await sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD);
-      await sonic.sync();
-    })();
-    
-    await Promise.race([loadPromise, timeout]);
+    console.log('SuperSonic: importing module…');
+    const mod=await Promise.race([import('https://unpkg.com/supersonic-scsynth@latest'), timeout]);
+    console.log('SuperSonic: module loaded, creating instance…');
+    const SuperSonic=mod.SuperSonic;
+    sonic=new SuperSonic({
+      baseURL:'https://unpkg.com/supersonic-scsynth@latest/dist/',
+      synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
+    });
+    console.log('SuperSonic: calling init()…');
+    if(badge){badge.textContent='⏳ Booting…';}
+    await Promise.race([sonic.init(), timeout]);
+    console.log('SuperSonic: loading synthdefs…');
+    if(badge){badge.textContent='⏳ Synths…';}
+    await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), timeout]);
+    await sonic.sync();
     sonicReady=true;
     sonicLoading=false;
-    console.log('SuperSonic ready');
+    console.log('SuperSonic: ready!');
     if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
   }catch(e){
-    console.warn('SuperSonic init failed, using Web Audio fallback:',e.message||e);
+    console.warn('SuperSonic failed at:',e.message||e);
+    if(sonic){try{sonic.shutdown();}catch(x){}}
     sonic=null;sonicReady=false;sonicLoading=false;
     if(badge){badge.textContent='Web Audio';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
   }
