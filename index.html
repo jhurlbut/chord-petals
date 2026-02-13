@@ -2070,12 +2070,6 @@ function render(){
       // Use pointerup instead of click — iOS Safari suppresses click
       // on elements with pointerdown handlers
       el.addEventListener('pointerup',(e)=>{
-        // Always clear drag state on petal pointerup
-        if(dragTarget===el){
-          dragTarget.classList.remove('dragging');
-          try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
-          dragTarget=null;dragType=null;
-        }
         if(el._wasDragged)return;
         e.stopPropagation();
         const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
@@ -2393,16 +2387,21 @@ function initDragSystem(){
     dragTarget=null;dragType=null;
   });
 
-  // Fallback: if pointer leaves window or document gets a pointerup, clean up
+  // Always clean up drag state on ANY pointerup (capture phase fires before stopPropagation)
   document.addEventListener('pointerup',(e)=>{
     if(dragTarget){
       dragTarget.classList.remove('dragging');
       dragTarget.style.transition='';dragTarget.style.opacity='1';
       try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
-      dragTarget=null;dragType=null;
-      render();
+      if(!dragTarget._wasDragged){
+        // Simple tap — just clear state, don't re-render
+        dragTarget=null;dragType=null;
+      } else {
+        dragTarget=null;dragType=null;
+        render();
+      }
     }
-  });
+  },true); // capture phase — fires before petal's stopPropagation
 }
 
 // ═══════════════════════════════════════════
