@@ -660,14 +660,19 @@ function applyVoicing(intervals){
 
 // Play a single note with the synth engine
 function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
-  const p=SYNTH_PRESETS[presetOverride||synthPreset]||SYNTH_PRESETS.warm;
-  const attack=p.attack,decay=p.decay,sustain=p.sustain,release=Math.min(p.release,duration*0.5);
+  const usedPreset=presetOverride||synthPreset;
+  const p=SYNTH_PRESETS[usedPreset]||SYNTH_PRESETS.warm;
+  // For accompaniment (presetOverride), enforce minimum attack/release to avoid clicks
+  const isAccomp=!!presetOverride;
+  const attack=isAccomp?Math.max(0.02,p.attack):p.attack;
+  const release=Math.min(isAccomp?Math.max(0.08,p.release):p.release,duration*0.5);
+  const decay=p.decay,sustain=p.sustain;
   const total=duration;
   const vGain=ctx.createGain();
   vGain.gain.setValueAtTime(0.001,startTime);
   vGain.gain.linearRampToValueAtTime(noteGain,startTime+attack);
   vGain.gain.linearRampToValueAtTime(noteGain*sustain,startTime+attack+decay);
-  vGain.gain.setValueAtTime(noteGain*sustain,startTime+total-release);
+  vGain.gain.setValueAtTime(noteGain*sustain,startTime+Math.max(0,total-release));
   vGain.gain.exponentialRampToValueAtTime(0.001,startTime+total);
   const filter=ctx.createBiquadFilter();filter.type='lowpass';
   filter.frequency.setValueAtTime(p.filterStart,startTime);
@@ -690,7 +695,7 @@ function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
     sub.connect(sg);sg.connect(filter);oscs.push(sub);
   }
   // Organ: add 2nd and 3rd harmonics
-  if(synthPreset==='organ'){
+  if(usedPreset==='organ'){
     const h2=ctx.createOscillator();h2.type='sine';h2.frequency.value=freq*2;
     const h3=ctx.createOscillator();h3.type='sine';h3.frequency.value=freq*3;
     const hg2=ctx.createGain();hg2.gain.value=0.25;const hg3=ctx.createGain();hg3.gain.value=0.12;
