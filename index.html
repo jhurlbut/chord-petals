@@ -260,11 +260,13 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   </div>
 </div>
 
-<!-- Voicing Panel -->
-<div class="midi-panel" id="voicePanel">
+<!-- Voicing Panel — full-screen overlay -->
+<div class="midi-panel" id="voicePanel" style="max-height:none;height:100vh;height:100dvh;overflow-y:auto;border-radius:0;padding-top:env(safe-area-inset-top,14px)">
   <h3><span>🎛 Voicing & Phrasing</span><button class="panel-close" onclick="document.getElementById('voicePanel').classList.remove('open')">✕</button></h3>
-  <label>Synth Sound</label>
-  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+
+  <!-- Instruments — grouped at top -->
+  <label>Web Synths</label>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
     <button class="voice-opt active" data-synth="warm" onclick="setSynth('warm')">Warm</button>
     <button class="voice-opt" data-synth="bright" onclick="setSynth('bright')">Bright</button>
     <button class="voice-opt" data-synth="pad" onclick="setSynth('pad')">Pad</button>
@@ -272,7 +274,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-synth="pluck" onclick="setSynth('pluck')">Pluck</button>
     <button class="voice-opt" data-synth="organ" onclick="setSynth('organ')">Organ</button>
   </div>
-  <label style="font-size:0.7em;opacity:0.6;margin-top:2px" id="sonicPiSynthLabel">⚡ Sonic Pi</label>
+  <label>⚡ Sonic Pi</label>
   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;opacity:0.4;transition:opacity 0.3s" id="sonicPiSynthGroup">
     <button class="voice-opt" data-synth="sp-prophet" onclick="setSynth('sp-prophet')">Prophet</button>
     <button class="voice-opt" data-synth="sp-blade" onclick="setSynth('sp-blade')">Blade</button>
@@ -280,31 +282,58 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-synth="sp-piano" onclick="setSynth('sp-piano')">Piano</button>
     <button class="voice-opt" data-synth="sp-pretty_bell" onclick="setSynth('sp-pretty_bell')">Bell</button>
   </div>
-  <label>Bass Root</label>
-  <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>Play root in bass octave</label>
-  <label>Voicing</label>
-  <div style="display:flex;gap:4px;margin-bottom:8px">
-    <button class="voice-opt active" data-voice="close" onclick="setVoiceMode('close')">Close</button>
-    <button class="voice-opt" data-voice="open" onclick="setVoiceMode('open')">Open</button>
-    <button class="voice-opt" data-voice="spread" onclick="setVoiceMode('spread')">Spread</button>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin:8px 0"></div>
+
+  <!-- Voicing controls -->
+  <div style="display:flex;gap:12px;margin-bottom:8px">
+    <div style="flex:1">
+      <label>Voicing</label>
+      <div style="display:flex;gap:4px">
+        <button class="voice-opt active" data-voice="close" onclick="setVoiceMode('close')">Close</button>
+        <button class="voice-opt" data-voice="open" onclick="setVoiceMode('open')">Open</button>
+        <button class="voice-opt" data-voice="spread" onclick="setVoiceMode('spread')">Spread</button>
+      </div>
+    </div>
+    <div style="flex:0 0 100px">
+      <label>Octave</label>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="voice-opt" onclick="shiftOctave(-1)" style="flex:0 0 36px">▼</button>
+        <span id="octaveLabel" style="flex:1;text-align:center;color:var(--text);font-size:13px">0</span>
+        <button class="voice-opt" onclick="shiftOctave(1)" style="flex:0 0 36px">▲</button>
+      </div>
+    </div>
   </div>
-  <label>Octave</label>
-  <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center">
-    <button class="voice-opt" onclick="shiftOctave(-1)" style="flex:0 0 48px">▼</button>
-    <span id="octaveLabel" style="flex:1;text-align:center;color:var(--text);font-size:13px">0</span>
-    <button class="voice-opt" onclick="shiftOctave(1)" style="flex:0 0 48px">▲</button>
+
+  <div style="display:flex;gap:12px;margin-bottom:8px">
+    <div style="flex:1">
+      <label>Phrasing</label>
+      <div style="display:flex;gap:4px">
+        <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
+        <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
+        <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
+      </div>
+    </div>
+    <div style="flex:0 0 100px">
+      <label>Bass Root</label>
+      <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>On</label>
+    </div>
   </div>
-  <label>Phrasing</label>
-  <div style="display:flex;gap:4px;margin-bottom:8px">
-    <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
-    <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
-    <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin:8px 0"></div>
+
+  <!-- SuperSonic FX -->
+  <label>⚡ SuperSonic FX</label>
+  <div style="display:flex;gap:12px;margin-bottom:4px">
+    <div style="flex:1">
+      <label>Reverb: <span id="ssReverbVal" style="color:var(--text)">30%</span></label>
+      <input type="range" min="0" max="100" step="5" value="30" style="width:100%" id="ssReverbSlider" oninput="setSSReverb(this.value)">
+    </div>
+    <div style="flex:1">
+      <label>Delay: <span id="ssDelayVal" style="color:var(--text)">Off</span></label>
+      <input type="range" min="0" max="100" step="5" value="0" style="width:100%" id="ssDelaySlider" oninput="setSSDelay(this.value)">
+    </div>
   </div>
-  <label style="font-size:0.7em;opacity:0.6;margin-top:4px">⚡ SuperSonic FX</label>
-  <label>Reverb: <span id="ssReverbVal" style="color:var(--text)">30%</span></label>
-  <input type="range" min="0" max="100" step="5" value="30" style="width:100%;margin-bottom:8px" id="ssReverbSlider" oninput="setSSReverb(this.value)">
-  <label>Delay: <span id="ssDelayVal" style="color:var(--text)">Off</span></label>
-  <input type="range" min="0" max="100" step="5" value="0" style="width:100%;margin-bottom:8px" id="ssDelaySlider" oninput="setSSDelay(this.value)">
   <label>Delay Time: <span id="ssDelayTimeVal" style="color:var(--text)">300ms</span></label>
   <input type="range" min="50" max="800" step="25" value="300" style="width:100%;margin-bottom:8px" id="ssDelayTimeSlider" oninput="setSSDelayTime(this.value)">
 </div>
