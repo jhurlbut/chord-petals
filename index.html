@@ -652,7 +652,7 @@ async function initSuperSonic(){
     const SuperSonic=window._SuperSonicClass;
     sonic=new SuperSonic({
       baseURL:'./dist/',
-      mode: typeof SharedArrayBuffer!=='undefined' ? 'sab' : 'postMessage',
+      mode: 'postMessage',
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
       sampleBaseURL:'https://unpkg.com/supersonic-scsynth-samples@latest/samples/',
     });
