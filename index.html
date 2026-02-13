@@ -650,9 +650,12 @@ async function initSuperSonic(){
     if(!window._SuperSonicClass) throw new Error('Module failed to load');
     console.log('SuperSonic: module ready, creating instance…');
     const SuperSonic=window._SuperSonicClass;
+    // Pass our existing AudioContext so iOS doesn't create a suspended one
+    const existingCtx=getAudio();
     sonic=new SuperSonic({
       baseURL:'./dist/',
       mode: typeof SharedArrayBuffer!=='undefined' ? 'sab' : 'postMessage',
+      audioContext: existingCtx,
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
       sampleBaseURL:'https://unpkg.com/supersonic-scsynth-samples@latest/samples/',
     });
