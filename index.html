@@ -1677,6 +1677,11 @@ function init(){
     btn.dataset.mode=m.id;
     bar.appendChild(btn);
   });
+  // Desktop: convert vertical wheel to horizontal scroll on mode bar
+  bar.addEventListener('wheel',(e)=>{
+    e.preventDefault();
+    bar.scrollLeft+=e.deltaY;
+  },{passive:false});
   buildKeyPopup();
   buildMidiChannels();
   render();
