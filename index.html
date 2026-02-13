@@ -256,6 +256,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="tool-btn" id="voiceBtn" onclick="toggleVoicePanel()" title="Voicing">🎛</button>
     <button class="tool-btn" id="improvBtn" onclick="toggleImprov()" title="AI Improvise">🎵</button>
     <button class="tool-btn" onclick="toggleMidiPanel()" title="MIDI">🎹</button>
+    <button class="tool-btn" id="recBtn" onclick="toggleRecordPanel()" title="Record/Play">⏺</button>
     <button class="tool-btn" onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" title="Debug Layout">🔧</button>
   </div>
 </div>
@@ -415,6 +416,24 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <input type="range" id="dbgVC" min="0.3" max="0.7" step="0.01" value="0.38" style="width:100%" oninput="dbgVertCenter=+this.value;document.getElementById('dbgVCVal').textContent=this.value;render()">
   <label>Petal size: <span id="dbgPSVal">0.90</span></label>
   <input type="range" id="dbgPS" min="0.4" max="1.5" step="0.05" value="0.90" style="width:100%" oninput="dbgPetalScale=+this.value;document.getElementById('dbgPSVal').textContent=this.value;render()">
+</div>
+
+<!-- Record/Play Panel -->
+<div class="midi-panel" id="recordPanel">
+  <h3><span>⏺ Record & Play</span><button class="panel-close" onclick="document.getElementById('recordPanel').classList.remove('open')">✕</button></h3>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+    <button class="voice-opt" id="recStartBtn" onclick="toggleRecording()" style="flex:1;font-size:14px;padding:8px">⏺ Record</button>
+    <button class="voice-opt" id="recPlayBtn" onclick="togglePlayback()" style="flex:1;font-size:14px;padding:8px" disabled>▶ Play</button>
+    <button class="voice-opt" id="recLoopBtn" onclick="toggleRecLoop()" style="flex:0 0 44px;font-size:14px;padding:8px">🔁</button>
+    <button class="voice-opt" onclick="clearRecording()" style="flex:0 0 44px;font-size:14px;padding:8px">🗑</button>
+  </div>
+  <div id="recTimeline" style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px;min-height:40px;font-size:11px;color:var(--text-dim);overflow-x:auto;white-space:nowrap">
+    <span id="recEmpty" style="opacity:0.4">Tap Record, then play some chords…</span>
+  </div>
+  <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+    <label style="margin:0;white-space:nowrap">Tempo: <span id="recTempoVal" style="color:var(--text)">1×</span></label>
+    <input type="range" min="0.5" max="2" step="0.1" value="1" style="flex:1" oninput="recPlaybackRate=+this.value;document.getElementById('recTempoVal').textContent=this.value+'×'">
+  </div>
 </div>
 
 <!-- MIDI Panel -->
@@ -1115,11 +1134,13 @@ function playChordNotes(rootNote,intervals){
 function playChord(rootNote,quality){
   if(!soundOn)return;
   const intervals=QUALITY[quality]?.intervals||[0,4,7];
+  recordChordEvent(rootNote,quality,null);
   playChordNotes(rootNote,intervals);
 }
 
 // Play chord with explicit interval array
 function playChordIntervals(rootNote,intervals){
+  recordChordEvent(rootNote,null,intervals);
   playChordNotes(rootNote,intervals);
 }
 
@@ -1764,7 +1785,7 @@ document.addEventListener('click',(e)=>{
 
 // Tap empty space in garden to add a petal
 function gardenEmptyTap(e){
-  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('#voicePanel')||e.target.closest('#improvPanel')||e.target.closest('#debugPanel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
+  if(e.target.closest('.petal')||e.target.closest('.center-chord')||e.target.closest('.rotation-ring')||e.target.closest('.key-popup')||e.target.closest('.petal-count')||e.target.closest('.delete-ring')||e.target.closest('.midi-panel')||e.target.closest('#voicePanel')||e.target.closest('#improvPanel')||e.target.closest('#recordPanel')||e.target.closest('#debugPanel')||e.target.closest('.tool-btn')||e.target.closest('.toolbar'))return;
   // Don't add petal if we just closed a panel
   const midiPanel=document.getElementById('midiPanel');
   const voicePanel=document.getElementById('voicePanel');
@@ -2264,6 +2285,7 @@ let midiActiveNotes=new Set(),midiHeldNotes=new Set(),midiNoteOffTimers={};
 function toggleVoicePanel(){
   document.getElementById('voicePanel').classList.toggle('open');
   document.getElementById('midiPanel').classList.remove('open');
+  document.getElementById('recordPanel').classList.remove('open');
 }
 function toggleBass(v){bassRoot=v;}
 function previewChord(){playChord(currentRoot,'major');}
@@ -2297,7 +2319,140 @@ function setPhraseMode(m){
   document.querySelectorAll('[data-phrase]').forEach(b=>b.classList.toggle('active',b.dataset.phrase===m));
   previewChord();
 }
-function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open');document.getElementById('voicePanel').classList.remove('open');}
+function toggleMidiPanel(){document.getElementById('midiPanel').classList.toggle('open');document.getElementById('voicePanel').classList.remove('open');document.getElementById('recordPanel').classList.remove('open');}
+
+// ═══════════════════════════════════════════
+// RECORD & PLAY
+// ═══════════════════════════════════════════
+let recChords=[];       // [{root, quality, intervals, time}] — time in ms from start
+let recStartTime=0;
+let recIsRecording=false;
+let recIsPlaying=false;
+let recLoop=false;
+let recPlaybackRate=1;
+let recPlayTimers=[];
+
+function toggleRecordPanel(){
+  const p=document.getElementById('recordPanel');
+  p.classList.toggle('open');
+  document.getElementById('voicePanel').classList.remove('open');
+  document.getElementById('midiPanel').classList.remove('open');
+  document.getElementById('improvPanel').classList.remove('open');
+  document.getElementById('recBtn').classList.toggle('active',p.classList.contains('open'));
+}
+
+function toggleRecording(){
+  if(recIsPlaying)stopPlayback();
+  recIsRecording=!recIsRecording;
+  const btn=document.getElementById('recStartBtn');
+  if(recIsRecording){
+    recChords=[];
+    recStartTime=performance.now();
+    btn.textContent='⏹ Stop';
+    btn.style.background='rgba(242,80,110,0.3)';
+    btn.style.color='#F2506E';
+    document.getElementById('recEmpty').style.display='none';
+    document.getElementById('recPlayBtn').disabled=true;
+    updateRecTimeline();
+  }else{
+    btn.textContent='⏺ Record';
+    btn.style.background='';btn.style.color='';
+    document.getElementById('recPlayBtn').disabled=recChords.length===0;
+    updateRecTimeline();
+  }
+}
+
+// Called from playChord / petal handlers to capture chords during recording
+function recordChordEvent(root, quality, intervals){
+  if(!recIsRecording)return;
+  const t=performance.now()-recStartTime;
+  recChords.push({root, quality, intervals, time:t});
+  updateRecTimeline();
+}
+
+function updateRecTimeline(){
+  const el=document.getElementById('recTimeline');
+  if(recChords.length===0){
+    el.innerHTML='<span id="recEmpty" style="opacity:0.4">Tap Record, then play some chords…</span>';
+    return;
+  }
+  el.innerHTML=recChords.map((c,i)=>{
+    const name=typeof noteName==='function'?noteName(c.root,true):'?';
+    const q=c.quality==='major'?'':c.quality==='minor'?'m':c.quality;
+    const sec=(c.time/1000).toFixed(1);
+    return '<span style="display:inline-block;background:rgba(255,255,255,0.08);border-radius:4px;padding:2px 6px;margin:2px;color:var(--text);font-size:11px" id="recChord'+i+'">'+name+q+' <span style="opacity:0.4;font-size:9px">'+sec+'s</span></span>';
+  }).join('');
+}
+
+function togglePlayback(){
+  if(recIsRecording)toggleRecording();
+  if(recIsPlaying){stopPlayback();return;}
+  if(recChords.length===0)return;
+  startPlayback();
+}
+
+function startPlayback(){
+  recIsPlaying=true;
+  const btn=document.getElementById('recPlayBtn');
+  btn.textContent='⏹ Stop';
+  btn.style.background='rgba(61,173,217,0.3)';btn.style.color='#3DADD9';
+
+  function scheduleChords(){
+    const totalTime=recChords[recChords.length-1].time;
+    recChords.forEach((c,i)=>{
+      const delay=c.time/recPlaybackRate;
+      const t=setTimeout(()=>{
+        // Highlight current chord in timeline
+        document.querySelectorAll('[id^="recChord"]').forEach(el=>el.style.background='rgba(255,255,255,0.08)');
+        const el=document.getElementById('recChord'+i);
+        if(el)el.style.background='rgba(61,173,217,0.3)';
+        // Play the chord
+        if(c.intervals){
+          playChordIntervals(c.root,c.intervals);
+        }else{
+          playChord(c.root,c.quality);
+        }
+        sendMIDIChord(c.root,c.quality);
+      },delay);
+      recPlayTimers.push(t);
+    });
+    // Schedule end / loop
+    const endDelay=(totalTime+500)/recPlaybackRate;
+    const endT=setTimeout(()=>{
+      if(recLoop&&recIsPlaying){
+        recPlayTimers=[];
+        scheduleChords();
+      }else{
+        stopPlayback();
+      }
+    },endDelay);
+    recPlayTimers.push(endT);
+  }
+  scheduleChords();
+}
+
+function stopPlayback(){
+  recIsPlaying=false;
+  recPlayTimers.forEach(t=>clearTimeout(t));
+  recPlayTimers=[];
+  const btn=document.getElementById('recPlayBtn');
+  btn.textContent='▶ Play';
+  btn.style.background='';btn.style.color='';
+  document.querySelectorAll('[id^="recChord"]').forEach(el=>el.style.background='rgba(255,255,255,0.08)');
+}
+
+function toggleRecLoop(){
+  recLoop=!recLoop;
+  document.getElementById('recLoopBtn').classList.toggle('active',recLoop);
+}
+
+function clearRecording(){
+  if(recIsPlaying)stopPlayback();
+  if(recIsRecording)toggleRecording();
+  recChords=[];
+  updateRecTimeline();
+  document.getElementById('recPlayBtn').disabled=true;
+}
 function closeMidiPanel(){
   const panel=document.getElementById('midiPanel');
   panel.classList.remove('open');
@@ -2318,6 +2473,12 @@ document.addEventListener('pointerdown',(e)=>{
   if(iPanel.classList.contains('open')&&!iPanel.contains(e.target)&&!e.target.closest('[onclick*="toggleImprov"]')){
     iPanel.classList.remove('open');
     iPanel._justClosed=true;setTimeout(()=>{delete iPanel._justClosed;},300);
+  }
+  const rPanel=document.getElementById('recordPanel');
+  if(rPanel.classList.contains('open')&&!rPanel.contains(e.target)&&!e.target.closest('[onclick*="toggleRecordPanel"]')&&!e.target.closest('#recBtn')){
+    rPanel.classList.remove('open');
+    document.getElementById('recBtn').classList.remove('active');
+    rPanel._justClosed=true;setTimeout(()=>{delete rPanel._justClosed;},300);
   }
 });
 function buildMidiChannels(){const s=document.getElementById('midiCh');for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.textContent='Ch '+i;s.appendChild(o);}}
