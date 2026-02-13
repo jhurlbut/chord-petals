@@ -2070,6 +2070,12 @@ function render(){
       // Use pointerup instead of click — iOS Safari suppresses click
       // on elements with pointerdown handlers
       el.addEventListener('pointerup',(e)=>{
+        // Always clear drag state on petal pointerup
+        if(dragTarget===el){
+          dragTarget.classList.remove('dragging');
+          try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
+          dragTarget=null;dragType=null;
+        }
         if(el._wasDragged)return;
         e.stopPropagation();
         const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
