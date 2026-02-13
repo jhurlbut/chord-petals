@@ -850,11 +850,10 @@ function removePetal(){
   render();
 }
 function addSubPetal(){
-  // Add an alternate voicing of the selected or next chord
-  // Uses inversions, drop voicings, spread — same note count as parent
+  // Add an alternate voicing to the last tapped petal (or round-robin if none selected)
   let tried=0;
   while(tried<petalCount){
-    const parentIdx=nextSubParent%petalCount;
+    const parentIdx=selectedPetal>=0&&selectedPetal<petalCount&&tried===0?selectedPetal:nextSubParent%petalCount;
     const mode=MODES.find(m=>m.id===currentMode);
     const allChords=mode.fn(currentRoot);
     const parentChord=allChords[parentIdx];
