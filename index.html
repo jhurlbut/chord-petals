@@ -650,12 +650,9 @@ async function initSuperSonic(){
     if(!window._SuperSonicClass) throw new Error('Module failed to load');
     console.log('SuperSonic: module ready, creating instance…');
     const SuperSonic=window._SuperSonicClass;
-    // Use a dedicated AudioContext for SuperSonic, created during user gesture
-    // (stored in _sonicAudioCtx, created early in ensureAudioReady)
     sonic=new SuperSonic({
       baseURL:'./dist/',
       mode: typeof SharedArrayBuffer!=='undefined' ? 'sab' : 'postMessage',
-      audioContext: window._sonicAudioCtx||undefined,
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
       sampleBaseURL:'https://unpkg.com/supersonic-scsynth-samples@latest/samples/',
     });
@@ -664,11 +661,13 @@ async function initSuperSonic(){
     if(badge){badge.textContent='⏳ Booting…';}
     const initResult=sonic.init();
     initResult.catch(e=>console.error('SuperSonic init rejected:',e));
-    await Promise.race([initResult, mkTimeout(15000)]);
-    console.log('SuperSonic: loading synthdefs…');
+    await Promise.race([initResult, mkTimeout(20000)]);
+    console.log('SuperSonic: init done! loading synthdefs…');
     if(badge){badge.textContent='⏳ Synths…';}
-    await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), mkTimeout(15000)]);
-    await sonic.sync();
+    const sdResult=await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), mkTimeout(20000)]);
+    console.log('SuperSonic: synthdefs loaded, syncing…',sdResult);
+    if(badge){badge.textContent='⏳ Sync…';}
+    await Promise.race([sonic.sync(), mkTimeout(10000)]);
     sonicReady=true;
     sonicLoading=false;
     console.log('SuperSonic: ready!');
@@ -682,7 +681,7 @@ async function initSuperSonic(){
     // Show error visually for debugging on mobile
     const errDiv=document.createElement('div');
     errDiv.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#300;color:#f88;font:10px monospace;padding:4px 8px;z-index:9999;max-height:80px;overflow:auto;';
-    errDiv.textContent='SS err: '+errMsg;
+    errDiv.textContent='SS err: '+errMsg+' | badge was: '+(badge?badge.textContent:'?');
     document.body.appendChild(errDiv);
     setTimeout(()=>errDiv.remove(),15000);
   }
@@ -740,10 +739,6 @@ function resumeAudioCtx(){
 function ensureAudioReady(e){
   getAudio();
   resumeAudioCtx();
-  // Pre-create SuperSonic's AudioContext during user gesture (iOS requires this)
-  if(!window._sonicAudioCtx&&typeof SharedArrayBuffer!=='undefined'){
-    window._sonicAudioCtx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive',sampleRate:48000});
-  }
   // Boot SuperSonic on first gesture (async, non-blocking)
   if(!sonic&&!sonicLoading)initSuperSonic();
 }
