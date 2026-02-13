@@ -297,12 +297,12 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable</label>
   <label>Model</label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
-    <button class="voice-opt active" data-improv-model="rnn" onclick="setImprovModel('rnn')">ImprovRNN</button>
-    <button class="voice-opt" data-improv-model="vae" onclick="setImprovModel('vae')">MelodyVAE</button>
+    <button class="voice-opt" data-improv-model="rnn" onclick="setImprovModel('rnn')">ImprovRNN</button>
+    <button class="voice-opt active" data-improv-model="vae" onclick="setImprovModel('vae')">MelodyVAE</button>
   </div>
-  <div id="improvContinuousRow" style="display:none">
+  <div id="improvContinuousRow">
     <label>Continuous</label>
-    <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)"><span class="sw"></span>Loop &amp; interpolate between chords</label>
+    <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)" checked><span class="sw"></span>Loop &amp; interpolate between chords</label>
   </div>
   <label>Accompaniment Sound</label>
   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
@@ -313,25 +313,25 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-improv-synth="pluck" onclick="setImprovSynth('pluck')">Pluck</button>
     <button class="voice-opt" data-improv-synth="organ" onclick="setImprovSynth('organ')">Organ</button>
   </div>
-  <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">100bpm</span></label>
-  <input type="range" min="60" max="200" step="10" value="100" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
-  <label>Length: <span id="improvStepsVal" style="color:var(--text)">2 bars</span></label>
+  <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">140bpm</span></label>
+  <input type="range" min="60" max="200" step="10" value="140" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
+  <label>Length: <span id="improvStepsVal" style="color:var(--text)">4 bars</span></label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
     <button class="voice-opt" onclick="setImprovSteps(8);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">½ bar</button>
     <button class="voice-opt" onclick="setImprovSteps(16);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">1 bar</button>
-    <button class="voice-opt active" onclick="setImprovSteps(32);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">2 bars</button>
-    <button class="voice-opt" onclick="setImprovSteps(64);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">4 bars</button>
+    <button class="voice-opt" onclick="setImprovSteps(32);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">2 bars</button>
+    <button class="voice-opt active" onclick="setImprovSteps(64);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">4 bars</button>
   </div>
-  <label>Creativity: <span id="improvTempVal" style="color:var(--text)">Balanced</span></label>
+  <label>Creativity: <span id="improvTempVal" style="color:var(--text)">Conservative</span></label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
-    <button class="voice-opt" onclick="setImprovTemp(0.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Safe</button>
+    <button class="voice-opt active" onclick="setImprovTemp(0.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Safe</button>
     <button class="voice-opt" onclick="setImprovTemp(0.8);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Gentle</button>
-    <button class="voice-opt active" onclick="setImprovTemp(1.1);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Balanced</button>
+    <button class="voice-opt" onclick="setImprovTemp(1.1);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Balanced</button>
     <button class="voice-opt" onclick="setImprovTemp(1.5);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Wild</button>
     <button class="voice-opt" onclick="setImprovTemp(2.0);this.parentNode.querySelectorAll('.voice-opt').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Chaos</button>
   </div>
-  <label>Volume: <span id="improvGainVal" style="color:var(--text)">8%</span></label>
-  <input type="range" min="0.02" max="0.3" step="0.01" value="0.08" style="width:100%;margin-bottom:8px" oninput="setImprovGain(this.value)">
+  <label>Volume: <span id="improvGainVal" style="color:var(--text)">3%</span></label>
+  <input type="range" min="0.02" max="0.3" step="0.01" value="0.03" style="width:100%;margin-bottom:8px" oninput="setImprovGain(this.value)">
   <label>Octave</label>
   <div style="display:flex;gap:4px;margin-bottom:8px;align-items:center">
     <button class="voice-opt" onclick="setImprovOctave(-1)" style="flex:0 0 48px">▼</button>
@@ -774,14 +774,14 @@ let improvEnabled=false;
 let improvPlaying=false;
 let improvTimers=[];
 // Improv settings
-let improvTempo=100;
-let improvSteps=32;
-let improvTemperature=1.1;
-let improvGain=0.08;
+let improvTempo=140;
+let improvSteps=64;
+let improvTemperature=0.5;
+let improvGain=0.03;
 let improvOctave=-1;
-let improvModel='rnn'; // 'rnn' or 'vae'
+let improvModel='vae'; // 'rnn' or 'vae'
 let improvSynth='pad'; // synth preset for accompaniment (default different from chord)
-let improvContinuous=false; // loop continuously
+let improvContinuous=true; // loop continuously
 let _lastVAESequence=null; // last generated VAE sequence (for interpolation)
 let _lastChordSym=null; // last chord symbol used
 let _continuousChord=null; // {rootIdx, quality} for continuous loop
