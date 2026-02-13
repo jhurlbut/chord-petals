@@ -431,8 +431,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <span id="recEmpty" style="opacity:0.4">Tap Record, then play some chords…</span>
   </div>
   <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
-    <label style="margin:0;white-space:nowrap">Tempo: <span id="recTempoVal" style="color:var(--text)">1×</span></label>
-    <input type="range" min="0.5" max="2" step="0.1" value="1" style="flex:1" oninput="recPlaybackRate=+this.value;document.getElementById('recTempoVal').textContent=this.value+'×'">
+    <label style="margin:0;white-space:nowrap">Speed: <span id="recTempoVal" style="color:var(--text)">0</span></label>
+    <input type="range" min="-5" max="5" step="0.5" value="0" style="flex:1" id="recSpeedSlider" oninput="setRecSpeed(this.value)">
   </div>
 </div>
 
@@ -2330,6 +2330,20 @@ let recIsRecording=false;
 let recIsPlaying=false;
 let recLoop=false;
 let recPlaybackRate=1;
+let recSpeed=0; // bipolar: -5 to +5, 0 = stopped
+
+function setRecSpeed(v){
+  recSpeed=+v;
+  document.getElementById('recTempoVal').textContent=v>0?'+'+v+'×':v==0?'0':v+'×';
+  // Map speed to playback rate: 0=paused, ±1=1×, ±5=5×
+  const absRate=Math.abs(recSpeed);
+  recPlaybackRate=absRate===0?0:absRate;
+  recReverse=recSpeed<0;
+  // If playing, restart with new speed/direction
+  if(recIsPlaying&&absRate>0){stopPlayback();startPlayback();}
+  else if(recIsPlaying&&absRate===0){stopPlayback();}
+}
+let recReverse=false;
 let recPlayTimers=[];
 
 function toggleRecordPanel(){
@@ -2388,6 +2402,7 @@ function togglePlayback(){
   if(recIsRecording)toggleRecording();
   if(recIsPlaying){stopPlayback();return;}
   if(recChords.length===0)return;
+  if(recPlaybackRate===0){recPlaybackRate=1;recSpeed=1;document.getElementById('recSpeedSlider').value=1;document.getElementById('recTempoVal').textContent='+1×';}
   startPlayback();
 }
 
@@ -2398,13 +2413,25 @@ function startPlayback(){
   btn.style.background='rgba(61,173,217,0.3)';btn.style.color='#3DADD9';
 
   function scheduleChords(){
+    if(recPlaybackRate===0)return;
     const totalTime=recChords[recChords.length-1].time;
-    recChords.forEach((c,i)=>{
-      const delay=c.time/recPlaybackRate;
+    // Build play order — reverse if speed is negative
+    const order=recReverse?[...recChords].reverse():recChords;
+    // Recalculate relative delays for reversed order
+    const times=order.map((c,i)=>{
+      if(recReverse){
+        return (totalTime-c.time)/recPlaybackRate;
+      }else{
+        return c.time/recPlaybackRate;
+      }
+    });
+    order.forEach((c,i)=>{
+      const delay=times[i];
+      const origIdx=recReverse?recChords.length-1-i:i;
       const t=setTimeout(()=>{
         // Highlight current chord in timeline
         document.querySelectorAll('[id^="recChord"]').forEach(el=>el.style.background='rgba(255,255,255,0.08)');
-        const el=document.getElementById('recChord'+i);
+        const el=document.getElementById('recChord'+origIdx);
         if(el)el.style.background='rgba(61,173,217,0.3)';
         // Play the chord
         if(c.intervals){
@@ -2474,12 +2501,7 @@ document.addEventListener('pointerdown',(e)=>{
     iPanel.classList.remove('open');
     iPanel._justClosed=true;setTimeout(()=>{delete iPanel._justClosed;},300);
   }
-  const rPanel=document.getElementById('recordPanel');
-  if(rPanel.classList.contains('open')&&!rPanel.contains(e.target)&&!e.target.closest('[onclick*="toggleRecordPanel"]')&&!e.target.closest('#recBtn')){
-    rPanel.classList.remove('open');
-    document.getElementById('recBtn').classList.remove('active');
-    rPanel._justClosed=true;setTimeout(()=>{delete rPanel._justClosed;},300);
-  }
+  // Record panel stays open — only closed via X button
 });
 function buildMidiChannels(){const s=document.getElementById('midiCh');for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.textContent='Ch '+i;s.appendChild(o);}}
 
