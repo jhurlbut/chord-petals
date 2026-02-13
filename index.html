@@ -292,6 +292,9 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt active" data-improv-model="rnn" onclick="setImprovModel('rnn')">ImprovRNN</button>
     <button class="voice-opt" data-improv-model="vae" onclick="setImprovModel('vae')">MelodyVAE</button>
   </div>
+  <div id="improvContinuousRow" style="display:none">
+    <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)"><span class="sw"></span>Continuous play (loops &amp; interpolates)</label>
+  </div>
   <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">100bpm</span></label>
   <input type="range" min="60" max="200" step="10" value="100" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
   <label>Length: <span id="improvStepsVal" style="color:var(--text)">2 bars</span></label>
@@ -755,6 +758,10 @@ let improvTemperature=1.1;
 let improvGain=0.08;
 let improvOctave=-1;
 let improvModel='rnn'; // 'rnn' or 'vae'
+let improvContinuous=false; // loop continuously
+let _lastVAESequence=null; // last generated VAE sequence (for interpolation)
+let _lastChordSym=null; // last chord symbol used
+let _continuousChord=null; // {rootIdx, quality} for continuous loop
 
 // Model instances (lazy-loaded)
 let _improvRNN=null, _improvVAE=null, _improvLoading=false;
@@ -811,8 +818,13 @@ function setImprovEnabled(v){
 function setImprovModel(m){
   improvModel=m;
   document.querySelectorAll('[data-improv-model]').forEach(b=>b.classList.toggle('active',b.dataset.improvModel===m));
-  // Pre-load selected model if improv is enabled
   if(improvEnabled)getImprovModel();
+  // Show/hide VAE-only options
+  document.getElementById('improvContinuousRow').style.display=m==='vae'?'':'none';
+}
+function setImprovContinuous(v){
+  improvContinuous=v;
+  if(!v){_continuousChord=null;}
 }
 function setImprovTempo(v){improvTempo=+v;document.getElementById('improvTempoVal').textContent=v+'bpm';}
 function setImprovSteps(v){improvSteps=+v;const labels={8:'½ bar',16:'1 bar',32:'2 bars',64:'4 bars'};document.getElementById('improvStepsVal').textContent=labels[v]||v+' steps';}
@@ -822,6 +834,7 @@ function setImprovOctave(d){improvOctave=Math.max(-2,Math.min(2,improvOctave+d))
 
 function stopImprov(){
   improvPlaying=false;
+  _continuousChord=null;
   improvTimers.forEach(t=>clearTimeout(t));
   improvTimers=[];
 }
@@ -858,6 +871,87 @@ function makeSeedSequence(rootIdx, quality){
   return mm.sequences.quantizeNoteSequence(unquantized, 4);
 }
 
+// Schedule and play a generated NoteSequence through our synth
+function playImprovSequence(result, onEnd){
+  const ctx=getAudio();
+  if(!ctx){if(onEnd)onEnd();return;}
+  const bpm=improvTempo;
+  const stepDur=60/(bpm*4);
+  
+  result.notes.forEach(note=>{
+    if(!improvPlaying)return;
+    const startMs=(note.quantizedStartStep*stepDur)*1000;
+    const dur=(note.quantizedEndStep-note.quantizedStartStep)*stepDur;
+    const shiftedPitch=note.pitch+(improvOctave*12);
+    const freq=440*Math.pow(2,(shiftedPitch-69)/12);
+    
+    const t=setTimeout(()=>{
+      if(!improvPlaying)return;
+      playNote(ctx,freq,ctx.currentTime,improvGain,Math.max(0.1,dur));
+    },startMs);
+    improvTimers.push(t);
+  });
+  
+  const totalMs=(result.totalQuantizedSteps*stepDur)*1000;
+  const endT=setTimeout(()=>{
+    if(onEnd)onEnd();
+  },totalMs);
+  improvTimers.push(endT);
+}
+
+// Generate a VAE sequence, interpolating from previous if available
+async function generateVAESequence(model, chordSym, temperature){
+  const chordProg=[chordSym,chordSym];
+  const controlArgs={chordProgression:chordProg};
+  
+  // If we have a previous sequence AND the chord changed, interpolate
+  if(_lastVAESequence && _lastChordSym && _lastChordSym!==chordSym){
+    try{
+      // Sample a new target for the new chord
+      const targets=await model.sample(1, temperature, controlArgs);
+      const target=targets[0];
+      // Interpolate from old to new (4 steps, take the middle ones for smooth transition)
+      const interps=await model.interpolate([_lastVAESequence, target], 4, temperature, controlArgs);
+      // Use step 2 (smooth blend toward new chord)
+      const blended=interps[2]||interps[1]||target;
+      _lastVAESequence=target; // store the pure target for next interpolation
+      _lastChordSym=chordSym;
+      return blended;
+    }catch(e){
+      console.warn('Interpolation failed, falling back to sample:',e);
+    }
+  }
+  
+  // Fresh sample (first time or same chord)
+  const samples=await model.sample(1, temperature, controlArgs);
+  _lastVAESequence=samples[0];
+  _lastChordSym=chordSym;
+  return samples[0];
+}
+
+// Continuous loop for VAE
+async function continuousLoop(){
+  if(!improvPlaying||!improvContinuous||!_continuousChord)return;
+  const model=await getImprovModel();
+  if(!model||improvModel!=='vae'){improvPlaying=false;return;}
+  
+  const{rootIdx,quality}=_continuousChord;
+  const chordSym=chordToMagentaSymbol(rootIdx,quality);
+  
+  try{
+    const result=await generateVAESequence(model, chordSym, improvTemperature);
+    if(!improvPlaying||!improvContinuous)return;
+    playImprovSequence(result,()=>{
+      // When this phrase ends, generate and play the next one
+      if(improvPlaying&&improvContinuous)continuousLoop();
+      else improvPlaying=false;
+    });
+  }catch(e){
+    console.error('Continuous loop failed:',e);
+    improvPlaying=false;
+  }
+}
+
 // Generate and play an improvisation over a chord
 async function improviseOverChord(rootIdx, quality, playChordFn){
   if(!improvEnabled||!soundOn)return;
@@ -866,6 +960,7 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
   if(!model){if(playChordFn)playChordFn();return;}
   
   improvPlaying=true;
+  _continuousChord={rootIdx,quality};
   const chordSym=chordToMagentaSymbol(rootIdx,quality);
   const seed=makeSeedSequence(rootIdx,quality);
   
@@ -874,13 +969,8 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
     const temperature=improvTemperature;
     
     if(improvModel==='vae'){
-      // MusicVAE mel_chords: sample a 2-bar melody conditioned on chords
-      // mel_chords uses 32 steps (2 bars at 4 steps/quarter in 4/4)
-      const chordProg=[chordSym,chordSym]; // one chord per bar
-      const samples=await model.sample(1, temperature, chordProg);
-      result=samples[0];
+      result=await generateVAESequence(model, chordSym, temperature);
     }else{
-      // MusicRNN chord_pitches_improv: continue sequence conditioned on chords
       const stepsToGen=improvSteps;
       const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
       result=await model.continueSequence(seed, stepsToGen, temperature, chordProg);
@@ -891,28 +981,14 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
     // Play chord and improv at the same instant
     if(playChordFn)playChordFn();
     
-    const ctx=getAudio();
-    if(!ctx)return;
-    const bpm=improvTempo;
-    const stepDur=60/(bpm*4);
-    
-    result.notes.forEach(note=>{
-      if(!improvPlaying)return;
-      const startMs=(note.quantizedStartStep*stepDur)*1000;
-      const dur=(note.quantizedEndStep-note.quantizedStartStep)*stepDur;
-      const shiftedPitch=note.pitch+(improvOctave*12);
-      const freq=440*Math.pow(2,(shiftedPitch-69)/12);
-      
-      const t=setTimeout(()=>{
-        if(!improvPlaying)return;
-        playNote(ctx,freq,ctx.currentTime,improvGain,Math.max(0.1,dur));
-      },startMs);
-      improvTimers.push(t);
+    playImprovSequence(result,()=>{
+      // If continuous mode + VAE, keep going
+      if(improvContinuous&&improvModel==='vae'&&improvPlaying){
+        continuousLoop();
+      }else{
+        improvPlaying=false;
+      }
     });
-    
-    const totalMs=(result.totalQuantizedSteps*stepDur)*1000+500;
-    const endT=setTimeout(()=>{improvPlaying=false;},totalMs);
-    improvTimers.push(endT);
   }catch(e){
     console.error('Improv generation failed:',e);
     improvPlaying=false;
