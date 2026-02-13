@@ -243,6 +243,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
       </div>
       <div class="key-popup" id="keyPopup"></div>
       <div class="petal-count">
+        <button id="lockBtn" onclick="toggleLock()" title="Lock root" style="font-size:16px">🔓</button>
         <button id="removeBtn">−</button>
         <span id="petalCountLabel" style="color:var(--text-dim);font-size:12px;display:flex;align-items:center">5</span>
         <button id="addBtn">+</button>
@@ -253,7 +254,6 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="tool-btn active" id="eyeBtn" onclick="toggleNames()" title="Show/hide names">👁</button>
     <button class="tool-btn" onclick="copyChords()" title="Copy chords">📋</button>
     <button class="tool-btn active" id="soundBtn" onclick="toggleSound()" title="Sound">🔊</button>
-    <button class="tool-btn" id="lockBtn" onclick="toggleLock()" title="Lock root">🔓</button>
     <button class="tool-btn" id="voiceBtn" onclick="toggleVoicePanel()" title="Voicing">🎛</button>
     <button class="tool-btn" id="improvBtn" onclick="toggleImprov()" title="AI Improvise">🎵</button>
     <button class="tool-btn" onclick="toggleMidiPanel()" title="MIDI">🎹</button>
