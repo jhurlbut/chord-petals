@@ -671,10 +671,20 @@ async function initSuperSonic(){
     sonicReady=true;
     sonicLoading=false;
     // Resume SuperSonic's internal AudioContext (may be suspended on iOS)
-    if(sonic.node&&sonic.node.context&&sonic.node.context.state==='suspended'){
-      sonic.node.context.resume().catch(()=>{});
-    }
-    console.log('SuperSonic: ready! ctx state:',sonic.node?.context?.state);
+    const ssCtx=sonic.node?.context;
+    if(ssCtx&&ssCtx.state==='suspended') await ssCtx.resume();
+    console.log('SuperSonic: ready! ctx state:',ssCtx?.state,'sampleRate:',ssCtx?.sampleRate);
+    // Play test note to verify audio output
+    try{
+      sonic.send('/s_new','sonic-pi-prophet',-1,0,0,'note',72,'amp',0.8,'attack',0.01,'sustain',0.3,'release',0.3);
+      console.log('SuperSonic: test note sent');
+    }catch(te){console.error('SuperSonic test note failed:',te);}
+    // Show diagnostic info
+    const diag=document.createElement('div');
+    diag.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#030;color:#8f8;font:10px monospace;padding:4px 8px;z-index:9999;';
+    diag.textContent='SS OK | ctx:'+ssCtx?.state+' | sr:'+ssCtx?.sampleRate+' | node:'+!!sonic.node+' | defs:'+sonic.loadedSynthDefs?.size;
+    document.body.appendChild(diag);
+    setTimeout(()=>diag.remove(),10000);
     const ssCtxState=sonic.node?.context?.state||'?';
     if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';badge.title='ctx:'+ssCtxState;}
   }catch(e){
