@@ -210,7 +210,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div class="widget">
   <!-- Header -->
   <div class="widget-header">
-    <div><span class="title">ChordPetals</span><span class="palette">Palette 1</span></div>
+    <div><span class="title">ChordPetals</span><span class="palette">Palette 1</span><span id="engineBadge" style="font-size:9px;padding:1px 5px;border-radius:6px;margin-left:6px;background:rgba(255,255,255,0.08);color:var(--text-dim)">Web Audio</span></div>
     <div class="header-actions">
       <button id="undoBtn" onclick="undoHistory()" title="Undo">↩</button>
       <button id="redoBtn" onclick="redoHistory()" title="Redo" disabled>↪</button>
@@ -609,6 +609,8 @@ const SONIC_SYNTHDEFS_TO_LOAD=Object.values(SONIC_SYNTH_MAP).filter((v,i,a)=>a.i
 async function initSuperSonic(){
   if(sonic||sonicLoading)return;
   sonicLoading=true;
+  const badge=document.getElementById('engineBadge');
+  if(badge){badge.textContent='⏳ Loading…';badge.style.color='var(--text-dim)';}
   try{
     const mod=await import('https://unpkg.com/supersonic-scsynth@latest');
     const SuperSonic=mod.SuperSonic;
@@ -622,6 +624,8 @@ async function initSuperSonic(){
     sonicReady=true;
     sonicLoading=false;
     console.log('SuperSonic ready');
+    const badge=document.getElementById('engineBadge');
+    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
   }catch(e){
     console.warn('SuperSonic init failed, using Web Audio fallback:',e);
     sonic=null;sonicReady=false;sonicLoading=false;
