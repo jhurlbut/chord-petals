@@ -292,11 +292,18 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" onclick="shiftOctave(1)" style="flex:0 0 48px">▲</button>
   </div>
   <label>Phrasing</label>
-  <div style="display:flex;gap:4px">
+  <div style="display:flex;gap:4px;margin-bottom:8px">
     <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
     <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
     <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
   </div>
+  <label style="font-size:0.7em;opacity:0.6;margin-top:4px">⚡ SuperSonic FX</label>
+  <label>Reverb: <span id="ssReverbVal" style="color:var(--text)">30%</span></label>
+  <input type="range" min="0" max="100" step="5" value="30" style="width:100%;margin-bottom:8px" id="ssReverbSlider" oninput="setSSReverb(this.value)">
+  <label>Delay: <span id="ssDelayVal" style="color:var(--text)">Off</span></label>
+  <input type="range" min="0" max="100" step="5" value="0" style="width:100%;margin-bottom:8px" id="ssDelaySlider" oninput="setSSDelay(this.value)">
+  <label>Delay Time: <span id="ssDelayTimeVal" style="color:var(--text)">300ms</span></label>
+  <input type="range" min="50" max="800" step="25" value="300" style="width:100%;margin-bottom:8px" id="ssDelayTimeSlider" oninput="setSSDelayTime(this.value)">
 </div>
 
 <!-- Improv Settings Panel -->
@@ -322,6 +329,14 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-improv-synth="keys" onclick="setImprovSynth('keys')">Keys</button>
     <button class="voice-opt" data-improv-synth="pluck" onclick="setImprovSynth('pluck')">Pluck</button>
     <button class="voice-opt" data-improv-synth="organ" onclick="setImprovSynth('organ')">Organ</button>
+  </div>
+  <label style="font-size:0.7em;opacity:0.6;margin-top:2px">⚡ Sonic Pi</label>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;opacity:0.4;transition:opacity 0.3s" id="sonicPiImprovGroup">
+    <button class="voice-opt" data-improv-synth="sp-prophet" onclick="setImprovSynth('sp-prophet')">Prophet</button>
+    <button class="voice-opt" data-improv-synth="sp-blade" onclick="setImprovSynth('sp-blade')">Blade</button>
+    <button class="voice-opt" data-improv-synth="sp-dark_ambience" onclick="setImprovSynth('sp-dark_ambience')">Dark Amb</button>
+    <button class="voice-opt" data-improv-synth="sp-piano" onclick="setImprovSynth('sp-piano')">Piano</button>
+    <button class="voice-opt" data-improv-synth="sp-pretty_bell" onclick="setImprovSynth('sp-pretty_bell')">Bell</button>
   </div>
   <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">140bpm</span></label>
   <input type="range" min="60" max="200" step="10" value="140" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
@@ -689,6 +704,11 @@ async function initSuperSonic(){
     // Enable Sonic Pi synth buttons
     const spGroup=document.getElementById('sonicPiSynthGroup');
     if(spGroup)spGroup.style.opacity='1';
+    const spImprov=document.getElementById('sonicPiImprovGroup');
+    if(spImprov)spImprov.style.opacity='1';
+    // Set up FX chain on SuperSonic output
+    ssFxSetup=false;
+    setupSSFxChain();
     // Resume SuperSonic's internal AudioContext (may be suspended on iOS)
     const ssCtx=sonic.node?.context;
     if(ssCtx&&ssCtx.state==='suspended') await ssCtx.resume();
@@ -732,6 +752,81 @@ async function initSuperSonic(){
 }
 
 function freqToMidi(freq){return Math.round(12*Math.log2(freq/440)+69);}
+
+// ═══════════════════════════════════════════
+// SuperSonic FX — Web Audio delay + reverb on SS output
+// ═══════════════════════════════════════════
+let ssFxReverb=0.3, ssFxDelay=0, ssFxDelayTime=0.3;
+let ssDelayNode=null, ssDelayFeedback=null, ssDelayWet=null, ssReverbGain=null, ssDryGain=null;
+let ssConvolver=null, ssFxSetup=false;
+
+function setupSSFxChain(){
+  if(ssFxSetup||!sonic||!sonic.node)return;
+  const ctx=sonic.node.context;
+  if(!ctx)return;
+  // Disconnect SuperSonic from default destination
+  try{sonic.node.disconnect();}catch(e){}
+
+  // Dry path
+  ssDryGain=ctx.createGain();
+  ssDryGain.gain.value=1-ssFxReverb;
+
+  // Reverb path (convolver with impulse)
+  ssConvolver=ctx.createConvolver();
+  const len=ctx.sampleRate*2;
+  const impulse=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let ch=0;ch<2;ch++){
+    const d=impulse.getChannelData(ch);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.5);
+  }
+  ssConvolver.buffer=impulse;
+  ssReverbGain=ctx.createGain();
+  ssReverbGain.gain.value=ssFxReverb;
+
+  // Delay path
+  ssDelayNode=ctx.createDelay(2.0);
+  ssDelayNode.delayTime.value=ssFxDelayTime;
+  ssDelayFeedback=ctx.createGain();
+  ssDelayFeedback.gain.value=0.4;
+  ssDelayWet=ctx.createGain();
+  ssDelayWet.gain.value=ssFxDelay;
+
+  // Wiring: sonic.node → dry → destination
+  //         sonic.node → convolver → reverbGain → destination
+  //         sonic.node → delay → feedback → delay (loop)
+  //                       delay → delayWet → destination
+  sonic.node.connect(ssDryGain);
+  ssDryGain.connect(ctx.destination);
+
+  sonic.node.connect(ssConvolver);
+  ssConvolver.connect(ssReverbGain);
+  ssReverbGain.connect(ctx.destination);
+
+  sonic.node.connect(ssDelayNode);
+  ssDelayNode.connect(ssDelayFeedback);
+  ssDelayFeedback.connect(ssDelayNode);
+  ssDelayNode.connect(ssDelayWet);
+  ssDelayWet.connect(ctx.destination);
+
+  ssFxSetup=true;
+}
+
+function setSSReverb(v){
+  ssFxReverb=v/100;
+  document.getElementById('ssReverbVal').textContent=v+'%';
+  if(ssReverbGain)ssReverbGain.gain.value=ssFxReverb;
+  if(ssDryGain)ssDryGain.gain.value=Math.max(0,1-ssFxReverb*0.5);
+}
+function setSSDelay(v){
+  ssFxDelay=v/100;
+  document.getElementById('ssDelayVal').textContent=v>0?v+'%':'Off';
+  if(ssDelayWet)ssDelayWet.gain.value=ssFxDelay;
+}
+function setSSDelayTime(v){
+  ssFxDelayTime=v/1000;
+  document.getElementById('ssDelayTimeVal').textContent=v+'ms';
+  if(ssDelayNode)ssDelayNode.delayTime.value=ssFxDelayTime;
+}
 
 // ═══════════════════════════════════════════
 // WEB AUDIO — Fallback Synth
@@ -1106,7 +1201,16 @@ function setImprovContinuous(v){
   improvContinuous=v;
   if(!v){_continuousChord=null;}
 }
-function setImprovSynth(s){improvSynth=s;document.querySelectorAll('[data-improv-synth]').forEach(b=>b.classList.toggle('active',b.dataset.improvSynth===s));}
+function setImprovSynth(s){
+  improvSynth=s;
+  if(SONIC_PI_PRESETS.has(s)){
+    if(!sonicReady&&!sonicLoading)initSuperSonic();
+    window._useWebAudio=false;
+    const badge=document.getElementById('engineBadge');
+    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
+  }
+  document.querySelectorAll('[data-improv-synth]').forEach(b=>b.classList.toggle('active',b.dataset.improvSynth===s));
+}
 function setImprovTempo(v){improvTempo=+v;document.getElementById('improvTempoVal').textContent=v+'bpm';}
 function setImprovSteps(v){improvSteps=+v;const labels={8:'½ bar',16:'1 bar',32:'2 bars',64:'4 bars'};document.getElementById('improvStepsVal').textContent=labels[v]||v+' steps';}
 function setImprovTemp(v){improvTemperature=+v;const labels={'0.5':'Conservative','0.8':'Gentle','1.1':'Balanced','1.5':'Wild','2.0':'Chaotic'};document.getElementById('improvTempVal').textContent=labels[v]||v;}
