@@ -1206,6 +1206,23 @@ function render(){
     if(sp.parentIdx>=chords.length)return;
     const parentPos=packPositions[sp.parentIdx];
     if(!parentPos)return;
+
+    // Sync sub-petal voicing with parent's current voicing level
+    const parentVL=petalVoicings[sp.parentIdx]||0;
+    if(sp.voiceLevel!==parentVL){
+      sp.voiceLevel=parentVL;
+      // Update alt voicing intervals for new note count
+      const parentChordTmp=chords[sp.parentIdx];
+      const extTmp=VOICING_EXTENSIONS[parentChordTmp.quality];
+      const baseIntTmp=extTmp?extTmp[parentVL]:QUALITY[parentChordTmp.quality]?.intervals||[0,4,7];
+      const ncTmp=baseIntTmp.length;
+      const altsTmp=getAltVoicings(parentChordTmp.quality,ncTmp);
+      if(altsTmp&&sp.altIdx<altsTmp.length){
+        const alt=altsTmp[sp.altIdx];
+        sp.altName=alt.name;sp.altIntervals=alt.intervals;
+      }
+    }
+
     // Place sub-petals just beyond the parent, offset by alt voicing index
     const pAngle=Math.atan2(parentPos.y,parentPos.x);
     const altIdx=sp.altIdx||sp.voiceLevel||1;
@@ -1230,10 +1247,42 @@ function render(){
     el.dataset.subIndex=si;
     el._subData={sp,parentChord,si};
 
+    // Build voicing rings for sub-petals (same style as main petals)
+    let subRingsHTML='';
+    if(parentVL>0){
+      const half=subDiam/2;
+      const hexMatch=solidColor.match(/#([0-9a-f]{6})/i);
+      let h=0,s=0,l=50;
+      if(hexMatch){
+        let R=parseInt(hexMatch[1].slice(0,2),16)/255;
+        let G=parseInt(hexMatch[1].slice(2,4),16)/255;
+        let B=parseInt(hexMatch[1].slice(4,6),16)/255;
+        const max=Math.max(R,G,B),min=Math.min(R,G,B);
+        l=(max+min)/2;
+        if(max!==min){
+          const d=max-min;
+          s=l>0.5?d/(2-max-min):d/(max+min);
+          if(max===R)h=((G-B)/d+(G<B?6:0))/6;
+          else if(max===G)h=((B-R)/d+2)/6;
+          else h=((R-G)/d+4)/6;
+        }
+        h=Math.round(h*360);s=Math.round(s*100);l=Math.round(l*100);
+      }
+      // Use desaturated base lightness for sub-petal rings
+      const desatL=Math.max(0,l-15);
+      subRingsHTML=`<svg class="petal-rings" viewBox="0 0 ${subDiam} ${subDiam}" width="${subDiam}" height="${subDiam}">`;
+      for(let r=1;r<=parentVL;r++){
+        const rr=half-r*(half/(parentVL+1.5));
+        const darkL=Math.max(0,desatL-r*10);
+        subRingsHTML+=`<circle cx="${half}" cy="${half}" r="${rr}" fill="hsl(${h},${Math.round(s*0.5)}%,${darkL}%)" />`;
+      }
+      subRingsHTML+='</svg>';
+    }
+
     const voiceLabel=sp.altName||VOICING_LABELS[sp.voiceLevel]||'';
     const fontSize=Math.max(8,Math.round(pR*0.3*subPetalScale));
     const displayName=showNames?parentChord.name+'\n'+voiceLabel:voiceLabel;
-    const newHTML=`<span class="petal-label" style="font-size:${fontSize}px;line-height:1.1">${displayName}</span>`;
+    const newHTML=`${subRingsHTML}<span class="petal-label" style="font-size:${fontSize}px;line-height:1.1;position:relative;z-index:2">${displayName}</span>`;
     if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
 
     if(!el._eventsAttached){
