@@ -2335,6 +2335,18 @@ function initDragSystem(){
     }
   });
 
+  // Also handle pointercancel (e.g. browser takes over gesture)
+  garden.addEventListener('pointercancel',(e)=>{
+    if(dragTarget){
+      dragTarget.classList.remove('dragging');
+      dragTarget.style.transition='';dragTarget.style.opacity='1';
+      try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
+    }
+    dragTarget=null;dragType=null;
+    document.getElementById('deleteRing').classList.remove('active','danger');
+    render();
+  });
+
   garden.addEventListener('pointerup',(e)=>{
     const delRing=document.getElementById('deleteRing');
     delRing.classList.remove('active','danger');
@@ -2342,6 +2354,7 @@ function initDragSystem(){
       dragTarget.classList.remove('dragging');
       dragTarget.style.transition='';
       dragTarget.style.opacity='1';
+      try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
       // Check if outside delete ring → remove petal
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
@@ -2372,6 +2385,17 @@ function initDragSystem(){
       }
     }
     dragTarget=null;dragType=null;
+  });
+
+  // Fallback: if pointer leaves window or document gets a pointerup, clean up
+  document.addEventListener('pointerup',(e)=>{
+    if(dragTarget){
+      dragTarget.classList.remove('dragging');
+      dragTarget.style.transition='';dragTarget.style.opacity='1';
+      try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
+      dragTarget=null;dragType=null;
+      render();
+    }
   });
 }
 
