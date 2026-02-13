@@ -312,7 +312,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
       <label>Polyphony</label>
       <div style="display:flex;gap:4px;align-items:center">
         <button class="voice-opt" onclick="setGlobalVoicing(-1)" style="flex:0 0 36px">▼</button>
-        <span id="polyLabel" style="flex:1;text-align:center;color:var(--text);font-size:12px">Triad</span>
+        <span id="polyLabel" style="flex:1;text-align:center;color:var(--text);font-size:12px">Triad (3)</span>
         <button class="voice-opt" onclick="setGlobalVoicing(1)" style="flex:0 0 36px">▲</button>
       </div>
     </div>
@@ -1214,9 +1214,19 @@ function playChordNotes(rootNote,intervals){
 
 function playChord(rootNote,quality){
   if(!soundOn)return;
-  // Use global voicing level if set
-  const ext=VOICING_EXTENSIONS[quality];
-  const intervals=ext&&ext[globalVoicingLevel]?ext[globalVoicingLevel]:(QUALITY[quality]?.intervals||[0,4,7]);
+  // Use global voicing level
+  let intervals;
+  if(globalVoicingLevel===0){
+    intervals=[0]; // single note (root only)
+  }else if(globalVoicingLevel===1){
+    // Dyad: root + 3rd (or root + 5th for dim)
+    const base=QUALITY[quality]?.intervals||[0,4,7];
+    intervals=base.slice(0,2);
+  }else{
+    const extLvl=getExtLevel();
+    const ext=VOICING_EXTENSIONS[quality];
+    intervals=ext&&ext[extLvl]?ext[extLvl]:(QUALITY[quality]?.intervals||[0,4,7]);
+  }
   recordChordEvent(rootNote,quality,intervals);
   playChordNotes(rootNote,intervals);
 }
@@ -2397,16 +2407,20 @@ function setVoiceMode(m){
   document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
   previewChord();
 }
-let globalVoicingLevel=0; // 0=triad, 1=7th, 2=9th, 3=11th
-const POLY_LABELS=['Triad (3)','7th (4)','9th (5)','11th (6)'];
+let globalVoicingLevel=2; // 0=single, 1=dyad, 2=triad, 3=7th, 4=9th, 5=11th
+const POLY_LABELS=['Single (1)','Dyad (2)','Triad (3)','7th (4)','9th (5)','11th (6)'];
+// Map globalVoicingLevel to VOICING_EXTENSIONS index (0=triad,1=7th,2=9th,3=11th)
+// globalVoicingLevel: 0=single, 1=dyad, 2=triad, 3=7th, 4=9th, 5=11th
+function getExtLevel(){return Math.max(0,globalVoicingLevel-2);}
 function setGlobalVoicing(dir){
-  globalVoicingLevel=Math.max(0,Math.min(3,globalVoicingLevel+dir));
+  globalVoicingLevel=Math.max(0,Math.min(5,globalVoicingLevel+dir));
   document.getElementById('polyLabel').textContent=POLY_LABELS[globalVoicingLevel];
-  // Apply to all petals
+  // Apply extension level to all petals (for petal tap path)
+  const extLvl=getExtLevel();
   const mode=MODES.find(m=>m.id===currentMode);
   if(mode){
     const chords=mode.fn(currentRoot);
-    chords.forEach((c,i)=>{petalVoicings[i]=globalVoicingLevel;});
+    chords.forEach((c,i)=>{petalVoicings[i]=extLvl;});
   }
   render();
   previewChord();
