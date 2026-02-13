@@ -645,10 +645,11 @@ async function initSuperSonic(){
     console.log('SuperSonic: ready!');
     if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
   }catch(e){
-    console.warn('SuperSonic failed at:',e.message||e);
+    const errMsg=(e.message||String(e)).slice(0,60);
+    console.warn('SuperSonic failed:',e);
     if(sonic){try{sonic.shutdown();}catch(x){}}
     sonic=null;sonicReady=false;sonicLoading=false;
-    if(badge){badge.textContent='Web Audio';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
+    if(badge){badge.textContent='Web Audio';badge.title='SuperSonic error: '+errMsg;badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
   }
 }
 
