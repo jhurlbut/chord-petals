@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" crossorigin="anonymous">
 <title>ChordPetals</title>
-<script src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1"></script>
+<!-- COOP/COEP service worker enables SharedArrayBuffer for SuperSonic -->
+<script src="coi-serviceworker.js"></script>
+<script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -645,6 +647,7 @@ async function initSuperSonic(){
     const SuperSonic=window._SuperSonicClass;
     sonic=new SuperSonic({
       baseURL:'./dist/',
+      mode: typeof SharedArrayBuffer!=='undefined' ? 'sab' : 'postMessage',
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
       sampleBaseURL:'https://unpkg.com/supersonic-scsynth-samples@latest/samples/',
     });
