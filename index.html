@@ -658,14 +658,71 @@ function applyVoicing(intervals){
   return v;
 }
 
+// ── Voice Management ──
+const MAX_ACCOMP_VOICES=12; // limit simultaneous accompaniment voices
+let accompVoices=[]; // separate tracking for accompaniment
+
+function cleanupExpiredVoices(){
+  if(!audioCtx)return;
+  const now=audioCtx.currentTime;
+  accompVoices=accompVoices.filter(v=>{
+    if(now>v.endTime+0.1){
+      try{v.oscs.forEach(o=>o.disconnect());v.gain.disconnect();v.filter.disconnect();}catch(e){}
+      return false;
+    }
+    return true;
+  });
+}
+
 // Play a single note with the synth engine
 function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
   const usedPreset=presetOverride||synthPreset;
   const p=SYNTH_PRESETS[usedPreset]||SYNTH_PRESETS.warm;
-  // For accompaniment (presetOverride), enforce minimum attack/release to avoid clicks
   const isAccomp=!!presetOverride;
-  const attack=isAccomp?Math.max(0.02,p.attack):p.attack;
-  const release=Math.min(isAccomp?Math.max(0.08,p.release):p.release,duration*0.5);
+  
+  // For accompaniment: use lightweight single-oscillator synth to reduce node count
+  if(isAccomp){
+    cleanupExpiredVoices();
+    // If at voice limit, steal oldest voice
+    if(accompVoices.length>=MAX_ACCOMP_VOICES){
+      const old=accompVoices.shift();
+      try{
+        const now=ctx.currentTime;
+        old.gain.gain.cancelScheduledValues(now);
+        old.gain.gain.setValueAtTime(old.gain.gain.value,now);
+        old.gain.gain.exponentialRampToValueAtTime(0.001,now+0.02);
+        old.oscs.forEach(o=>{try{o.stop(now+0.03)}catch(e){}});
+      }catch(e){}
+    }
+    
+    const attack=Math.max(0.02,p.attack);
+    const release=Math.min(Math.max(0.08,p.release),duration*0.5);
+    const total=duration;
+    const endTime=startTime+total;
+    
+    // Single oscillator + simple gain envelope (no filter for perf)
+    const vGain=ctx.createGain();
+    vGain.gain.setValueAtTime(0.001,startTime);
+    vGain.gain.linearRampToValueAtTime(noteGain,startTime+attack);
+    vGain.gain.linearRampToValueAtTime(noteGain*p.sustain,startTime+attack+p.decay);
+    vGain.gain.setValueAtTime(noteGain*p.sustain,startTime+Math.max(0,total-release));
+    vGain.gain.exponentialRampToValueAtTime(0.001,endTime);
+    
+    const osc=ctx.createOscillator();
+    osc.type=p.osc==='sawtooth'?'triangle':p.osc; // triangle instead of saw for softer accomp
+    osc.frequency.value=freq;
+    osc.connect(vGain);
+    vGain.connect(masterGain);
+    osc.start(startTime);
+    osc.stop(endTime+0.1);
+    
+    accompVoices.push({oscs:[osc],gain:vGain,filter:vGain,endTime});
+    return;
+  }
+  
+  // Full synth for chord notes (unchanged)
+  const attack=p.attack;
+  const release=Math.min(p.release,duration*0.5);
   const decay=p.decay,sustain=p.sustain;
   const total=duration;
   const vGain=ctx.createGain();
@@ -694,7 +751,6 @@ function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
     const sg=ctx.createGain();sg.gain.value=p.subVol;
     sub.connect(sg);sg.connect(filter);oscs.push(sub);
   }
-  // Organ: add 2nd and 3rd harmonics
   if(usedPreset==='organ'){
     const h2=ctx.createOscillator();h2.type='sine';h2.frequency.value=freq*2;
     const h3=ctx.createOscillator();h3.type='sine';h3.frequency.value=freq*3;
