@@ -149,6 +149,11 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
   width:4px;height:4px;border-radius:50%;background:var(--major);
 }
+.tool-btn.loading{animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.improv-loading{display:none;align-items:center;gap:6px;padding:6px 0;color:var(--text-dim);font-size:12px}
+.improv-loading.show{display:flex}
+.improv-loading .spinner{width:14px;height:14px;border:2px solid var(--text-dim);border-top-color:var(--major);border-radius:50%;animation:spin 0.8s linear infinite}
 
 /* ── Key Selector Popup ── */
 .key-popup{
@@ -286,6 +291,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <!-- Improv Settings Panel -->
 <div class="midi-panel" id="improvPanel">
   <h3>🎵 AI Improvisation</h3>
+  <div class="improv-loading" id="improvLoadingBar"><div class="spinner"></div><span id="improvLoadingText">Loading model…</span></div>
   <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable improvisation</label>
   <label>Model</label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
@@ -771,6 +777,19 @@ const CHECKPOINTS={
   vae:'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/mel_chords'
 };
 
+function showImprovLoading(show,text){
+  const bar=document.getElementById('improvLoadingBar');
+  const btn=document.getElementById('improvBtn');
+  if(show){
+    bar.classList.add('show');
+    btn.classList.add('loading');
+    if(text)document.getElementById('improvLoadingText').textContent=text;
+  }else{
+    bar.classList.remove('show');
+    btn.classList.remove('loading');
+  }
+}
+
 async function getImprovModel(){
   if(improvModel==='vae'){
     if(_improvVAE)return _improvVAE;
@@ -779,21 +798,26 @@ async function getImprovModel(){
   }
   if(_improvLoading)return null;
   _improvLoading=true;
+  const modelName=improvModel==='vae'?'MelodyVAE (17.6MB)':'ImprovRNN (5.6MB)';
+  showImprovLoading(true,`Loading ${modelName}…`);
   try{
     if(improvModel==='vae'){
       _improvVAE=new mm.MusicVAE(CHECKPOINTS.vae);
       await _improvVAE.initialize();
       _improvLoading=false;
+      showImprovLoading(false);
       return _improvVAE;
     }else{
       _improvRNN=new mm.MusicRNN(CHECKPOINTS.rnn);
       await _improvRNN.initialize();
       _improvLoading=false;
+      showImprovLoading(false);
       return _improvRNN;
     }
   }catch(e){
     console.error('Magenta init failed:',e);
     _improvLoading=false;
+    showImprovLoading(false);
     return null;
   }
 }
@@ -967,6 +991,7 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
   try{
     let result;
     const temperature=improvTemperature;
+    showImprovLoading(true,'Generating melody…');
     
     if(improvModel==='vae'){
       result=await generateVAESequence(model, chordSym, temperature);
@@ -975,6 +1000,7 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
       const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
       result=await model.continueSequence(seed, stepsToGen, temperature, chordProg);
     }
+    showImprovLoading(false);
     
     if(!improvPlaying){if(playChordFn)playChordFn();return;}
     
