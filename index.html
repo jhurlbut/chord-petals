@@ -381,6 +381,13 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <div class="midi-note" id="midiNote"></div>
 </div>
 
+<!-- Pre-load SuperSonic as ES module (iOS Safari needs proper module context) -->
+<script type="module">
+import { SuperSonic } from 'https://unpkg.com/supersonic-scsynth@latest';
+window._SuperSonicClass = SuperSonic;
+window.dispatchEvent(new Event('supersonic-ready'));
+</script>
+
 <script>
 // ═══════════════════════════════════════════
 // MUSIC THEORY ENGINE
@@ -622,23 +629,30 @@ async function initSuperSonic(){
     return;
   }
   
-  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),12000));
+  const mkTimeout=(ms)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms));
   
   try{
-    console.log('SuperSonic: importing module…');
-    const mod=await Promise.race([import('https://unpkg.com/supersonic-scsynth@latest'), timeout]);
-    console.log('SuperSonic: module loaded, creating instance…');
-    const SuperSonic=mod.SuperSonic;
+    console.log('SuperSonic: waiting for module…');
+    // Wait for the pre-loaded ES module (or timeout after 10s)
+    if(!window._SuperSonicClass){
+      await Promise.race([
+        new Promise(r=>{window.addEventListener('supersonic-ready',r,{once:true});}),
+        mkTimeout(10000)
+      ]);
+    }
+    if(!window._SuperSonicClass) throw new Error('Module failed to load');
+    console.log('SuperSonic: module ready, creating instance…');
+    const SuperSonic=window._SuperSonicClass;
     sonic=new SuperSonic({
       baseURL:'https://unpkg.com/supersonic-scsynth@latest/dist/',
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
     });
     console.log('SuperSonic: calling init()…');
     if(badge){badge.textContent='⏳ Booting…';}
-    await Promise.race([sonic.init(), timeout]);
+    await Promise.race([sonic.init(), mkTimeout(15000)]);
     console.log('SuperSonic: loading synthdefs…');
     if(badge){badge.textContent='⏳ Synths…';}
-    await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), timeout]);
+    await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), mkTimeout(15000)]);
     await sonic.sync();
     sonicReady=true;
     sonicLoading=false;
