@@ -15,7 +15,26 @@ python3 -m http.server 8888
 npx serve .
 ```
 
-## Deploying (quick tunnel)
+## Deploying to Cloudflare Pages
+
+**Live URL:** https://chord-petals.pages.dev
+
+Deploys via `wrangler pages deploy` (NOT auto-deploy from GitHub — must be run manually after each push).
+
+```bash
+# Requires CLOUDFLARE_API_TOKEN env var
+export CLOUDFLARE_API_TOKEN="<token>"
+npx wrangler pages deploy . --project-name=chord-petals
+```
+
+- **Account ID:** `e4c92c46f0e895a2e1729342186cf594`
+- **Project:** `chord-petals`
+- Wrangler auto-detects git branch/commit from the repo
+- No build step — deploys the directory as-is
+
+**Important:** After every `git push`, also run the wrangler deploy command above to update the live site. GitHub pushes alone do NOT update `chord-petals.pages.dev`.
+
+### Quick tunnel (alternative, temporary)
 ```bash
 cloudflared tunnel --url http://localhost:8888
 ```
