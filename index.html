@@ -1806,14 +1806,18 @@ function buildKeyPopup(){
   NOTES.forEach((n,i)=>{
     const btn=document.createElement('button');
     btn.textContent=noteName(i,true);
-    btn.onclick=(e)=>{e.stopPropagation();popup.classList.remove('show');setRoot(i,noteName(i,true));};
+    btn.onclick=(e)=>{e.stopPropagation();if(!keyPopupReady)return;popup.classList.remove('show');setRoot(i,noteName(i,true));};
     popup.appendChild(btn);
   });
 }
+let keyPopupReady=false;
 function showKeyPopup(){
   const popup=document.getElementById('keyPopup');
   popup.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('current',i===currentRoot));
+  keyPopupReady=false;
   popup.classList.add('show');
+  // Delay accepting taps so long-press release doesn't instantly select
+  setTimeout(()=>{keyPopupReady=true;},400);
 }
 
 // Swipe up/down on center to change scale
