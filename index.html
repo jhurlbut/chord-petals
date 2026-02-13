@@ -97,6 +97,10 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   z-index:10;cursor:pointer;transition:transform .15s,box-shadow .3s;
   transform:translate(-50%,-50%);
 }
+/* Larger invisible tap target around center */
+.center-chord::before{
+  content:'';position:absolute;top:-12px;left:-12px;right:-12px;bottom:-12px;border-radius:50%;
+}
 .center-chord:active{transform:translate(-50%,-50%) scale(0.93)}
 .center-chord .name{font-size:22px;font-weight:700;line-height:1}
 .center-chord .sub{font-size:9px;color:var(--text-dim);margin-top:1px}
@@ -1711,7 +1715,16 @@ document.getElementById('center').addEventListener('touchend',(e)=>{
   if(centerTouchStartY===null)return;
   const dy=e.changedTouches[0].clientY-centerTouchStartY;
   centerTouchStartY=null;
-  if(Math.abs(dy)<20)return; // too small, treat as tap
+  if(Math.abs(dy)<30){
+    // Tap — play chord immediately (don't rely on click event)
+    e.preventDefault();e.stopPropagation();
+    playChord(currentRoot,'major');
+    sendMIDIChord(currentRoot,'major');
+    const el=document.getElementById('center');
+    el.style.transform='translate(-50%,-50%) scale(1.08)';
+    setTimeout(()=>el.style.transform='translate(-50%,-50%)',150);
+    return;
+  }
   e.preventDefault();e.stopPropagation();
   const idx=SCALE_TYPES.indexOf(currentScale);
   if(dy<0){// swipe up = next
