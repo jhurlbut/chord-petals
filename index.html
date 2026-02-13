@@ -1061,6 +1061,7 @@ function render(){
 
       let tapC=0,tapT,longPressT;
       el.addEventListener('pointerdown',(ev)=>{
+        el._wasDragged=false; // reset from previous long-press
         const{ch:c,i:idx}=el._chordData;
         tapC++;
         if(tapC===2){
@@ -1073,9 +1074,7 @@ function render(){
         longPressT=setTimeout(()=>{
           const cur=petalVoicings[idx]||0;
           petalVoicings[idx]=(cur+1)%4;
-          el._wasDragged=true; // suppress click after long-press
-          // Reset _wasDragged after click event would have fired
-          setTimeout(()=>{el._wasDragged=false;},300);
+          el._wasDragged=true; // suppress pointerup sound after long-press
           render();
           const vl2=petalVoicings[idx];
           const ext2=VOICING_EXTENSIONS[c.quality];
