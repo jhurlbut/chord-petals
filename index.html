@@ -308,16 +308,27 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
   <div style="display:flex;gap:12px;margin-bottom:8px">
     <div style="flex:1">
+      <label>Polyphony</label>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="voice-opt" onclick="setGlobalVoicing(-1)" style="flex:0 0 36px">▼</button>
+        <span id="polyLabel" style="flex:1;text-align:center;color:var(--text);font-size:12px">Triad</span>
+        <button class="voice-opt" onclick="setGlobalVoicing(1)" style="flex:0 0 36px">▲</button>
+      </div>
+    </div>
+    <div style="flex:0 0 100px">
+      <label>Bass Root</label>
+      <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>On</label>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:8px">
+    <div style="flex:1">
       <label>Phrasing</label>
       <div style="display:flex;gap:4px">
         <button class="voice-opt active" data-phrase="block" onclick="setPhraseMode('block')">Block</button>
         <button class="voice-opt" data-phrase="strum" onclick="setPhraseMode('strum')">Strum</button>
         <button class="voice-opt" data-phrase="arpeggio" onclick="setPhraseMode('arpeggio')">Arpeggio</button>
       </div>
-    </div>
-    <div style="flex:0 0 100px">
-      <label>Bass Root</label>
-      <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>On</label>
     </div>
   </div>
 
@@ -2381,6 +2392,20 @@ function shiftOctave(dir){
 function setVoiceMode(m){
   voicingMode=m;
   document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('active',b.dataset.voice===m));
+  previewChord();
+}
+let globalVoicingLevel=0; // 0=triad, 1=7th, 2=9th, 3=11th
+const POLY_LABELS=['Triad (3)','7th (4)','9th (5)','11th (6)'];
+function setGlobalVoicing(dir){
+  globalVoicingLevel=Math.max(0,Math.min(3,globalVoicingLevel+dir));
+  document.getElementById('polyLabel').textContent=POLY_LABELS[globalVoicingLevel];
+  // Apply to all petals
+  const mode=MODES.find(m=>m.id===currentMode);
+  if(mode){
+    const chords=mode.fn(currentRoot);
+    chords.forEach((c,i)=>{petalVoicings[i]=globalVoicingLevel;});
+  }
+  render();
   previewChord();
 }
 function setPhraseMode(m){
