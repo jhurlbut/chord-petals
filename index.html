@@ -187,17 +187,18 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;outline:none;
 }
 .midi-row{display:flex;gap:10px}.midi-row>*{flex:1}
-.midi-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;margin-top:8px}
+.midi-toggle{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim);cursor:pointer;margin-top:4px;margin-bottom:8px}
 .midi-toggle input{display:none}
 .midi-toggle .sw{
-  width:32px;height:17px;border-radius:9px;background:rgba(255,255,255,0.1);position:relative;transition:background .2s;
+  width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,0.12);position:relative;transition:background .2s;
+  border:1px solid rgba(255,255,255,0.08);flex-shrink:0;
 }
-.midi-toggle input:checked+.sw{background:rgba(242,80,110,0.5)}
+.midi-toggle input:checked+.sw{background:rgba(242,80,110,0.6);border-color:rgba(242,80,110,0.4)}
 .midi-toggle .sw::after{
-  content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
-  background:#fff;transition:transform .2s;
+  content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:rgba(255,255,255,0.5);transition:transform .2s,background .2s;
 }
-.midi-toggle input:checked+.sw::after{transform:translateX(15px)}
+.midi-toggle input:checked+.sw::after{transform:translateX(16px);background:#fff}
 .midi-note{font-size:10px;color:var(--text-dim);margin-top:6px;opacity:0.6}
 .voice-opt{flex:1;padding:6px 4px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:var(--text);font-size:11px;cursor:pointer;font-family:inherit}
 .voice-opt.active{background:rgba(242,80,110,0.25);border-color:rgba(242,80,110,0.5)}
@@ -292,14 +293,16 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div class="midi-panel" id="improvPanel">
   <h3>🎵 AI Improvisation</h3>
   <div class="improv-loading" id="improvLoadingBar"><div class="spinner"></div><span id="improvLoadingText">Loading model…</span></div>
-  <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable improvisation</label>
+  <label>Improvisation</label>
+  <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable</label>
   <label>Model</label>
   <div style="display:flex;gap:4px;margin-bottom:8px">
     <button class="voice-opt active" data-improv-model="rnn" onclick="setImprovModel('rnn')">ImprovRNN</button>
     <button class="voice-opt" data-improv-model="vae" onclick="setImprovModel('vae')">MelodyVAE</button>
   </div>
   <div id="improvContinuousRow" style="display:none">
-    <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)"><span class="sw"></span>Continuous play (loops &amp; interpolates)</label>
+    <label>Continuous</label>
+    <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)"><span class="sw"></span>Loop &amp; interpolate between chords</label>
   </div>
   <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">100bpm</span></label>
   <input type="range" min="60" max="200" step="10" value="100" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
