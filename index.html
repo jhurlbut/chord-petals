@@ -362,6 +362,93 @@ const VOICING_EXTENSIONS = {
 };
 const VOICING_LABELS = ['','7','9','11'];
 
+// Alternate voicings: inversions, drop voicings, spread, close high
+// Each entry maps to arrays of voicing variants per note count (triad=3, 7th=4, etc.)
+// Voicing 0 = root position (default), 1+ = alternates
+const ALT_VOICINGS = {
+  major: {
+    3: [
+      {name:'Root',    intervals:[0,4,7]},
+      {name:'1st Inv', intervals:[4,7,12]},        // E in bass
+      {name:'2nd Inv', intervals:[7,12,16]},        // G in bass
+      {name:'Close Hi',intervals:[12,16,19]},       // octave up close
+      {name:'Spread',  intervals:[0,12,16]},        // root + octave spread
+      {name:'Drop 2',  intervals:[4,12,19]},        // drop 2nd voice
+    ],
+    4: [
+      {name:'Root',    intervals:[0,4,7,11]},
+      {name:'1st Inv', intervals:[4,7,11,12]},
+      {name:'2nd Inv', intervals:[7,11,12,16]},
+      {name:'3rd Inv', intervals:[11,12,16,19]},
+      {name:'Drop 2',  intervals:[4,12,16,23]},     // drop 2 spread
+      {name:'Shell',   intervals:[0,4,11,19]},      // shell voicing (R-3-7-5up)
+    ],
+  },
+  minor: {
+    3: [
+      {name:'Root',    intervals:[0,3,7]},
+      {name:'1st Inv', intervals:[3,7,12]},
+      {name:'2nd Inv', intervals:[7,12,15]},
+      {name:'Close Hi',intervals:[12,15,19]},
+      {name:'Spread',  intervals:[0,12,15]},
+      {name:'Drop 2',  intervals:[3,12,19]},
+    ],
+    4: [
+      {name:'Root',    intervals:[0,3,7,10]},
+      {name:'1st Inv', intervals:[3,7,10,12]},
+      {name:'2nd Inv', intervals:[7,10,12,15]},
+      {name:'3rd Inv', intervals:[10,12,15,19]},
+      {name:'Drop 2',  intervals:[3,12,15,22]},
+      {name:'Shell',   intervals:[0,3,10,19]},
+    ],
+  },
+  dim: {
+    3: [
+      {name:'Root',    intervals:[0,3,6]},
+      {name:'1st Inv', intervals:[3,6,12]},
+      {name:'2nd Inv', intervals:[6,12,15]},
+    ],
+    4: [
+      {name:'Root',    intervals:[0,3,6,9]},
+      {name:'1st Inv', intervals:[3,6,9,12]},
+      {name:'2nd Inv', intervals:[6,9,12,15]},
+      {name:'3rd Inv', intervals:[9,12,15,18]},
+    ],
+  },
+  dom7: {
+    3: [
+      {name:'Root',    intervals:[0,4,7]},
+      {name:'1st Inv', intervals:[4,7,12]},
+      {name:'2nd Inv', intervals:[7,12,16]},
+      {name:'Tritone',intervals:[6,10,12]},         // tritone sub voicing
+    ],
+    4: [
+      {name:'Root',    intervals:[0,4,7,10]},
+      {name:'1st Inv', intervals:[4,7,10,12]},
+      {name:'2nd Inv', intervals:[7,10,12,16]},
+      {name:'3rd Inv', intervals:[10,12,16,19]},
+      {name:'Shell',   intervals:[0,4,10,19]},
+      {name:'UpStr',   intervals:[6,10,13,18]},     // upper structure (tritone away)
+    ],
+  },
+};
+// Fallback: generate inversions for any quality
+function getAltVoicings(quality, noteCount){
+  const alts=ALT_VOICINGS[quality];
+  if(alts&&alts[noteCount])return alts[noteCount];
+  // Auto-generate inversions from VOICING_EXTENSIONS
+  const ext=VOICING_EXTENSIONS[quality];
+  if(!ext)return null;
+  const voiceIdx=Math.max(0,noteCount-3);
+  const base=ext[voiceIdx]||ext[0];
+  const result=[{name:'Root',intervals:[...base]}];
+  for(let inv=1;inv<base.length;inv++){
+    const rotated=base.slice(inv).concat(base.slice(0,inv).map(n=>n+12));
+    result.push({name:`Inv ${inv}`,intervals:rotated});
+  }
+  return result;
+}
+
 function noteName(idx, preferFlat=false){
   const n=NOTES[((idx%12)+12)%12];
   return preferFlat&&FLAT_MAP[n]?FLAT_MAP[n]:n;
@@ -763,25 +850,41 @@ function removePetal(){
   render();
 }
 function addSubPetal(){
-  // Find the next inner petal that could use a voicing variant
-  // Cycle: 7th, 9th, 11th for each parent, then move to next parent
-  const maxVoice=3; // 1=7th, 2=9th, 3=11th
-  // Find next parent that doesn't have all 3 voicings yet
+  // Add an alternate voicing of the selected or next chord
+  // Uses inversions, drop voicings, spread — same note count as parent
   let tried=0;
   while(tried<petalCount){
     const parentIdx=nextSubParent%petalCount;
+    const mode=MODES.find(m=>m.id===currentMode);
+    const allChords=mode.fn(currentRoot);
+    const parentChord=allChords[parentIdx];
+    if(!parentChord){nextSubParent=(parentIdx+1)%petalCount;tried++;continue;}
+    
+    // Determine note count from parent's current voicing level
+    const parentVL=petalVoicings[parentIdx]||0;
+    const ext=VOICING_EXTENSIONS[parentChord.quality];
+    const baseIntervals=ext?ext[parentVL]:QUALITY[parentChord.quality]?.intervals||[0,4,7];
+    const noteCount=baseIntervals.length;
+    
+    // Get available alternate voicings for this quality + note count
+    const alts=getAltVoicings(parentChord.quality,noteCount);
+    if(!alts){nextSubParent=(parentIdx+1)%petalCount;tried++;continue;}
+    
+    // Find next unused voicing (skip root position = index 0)
     const existing=subPetals.filter(sp=>sp.parentIdx===parentIdx);
-    if(existing.length<maxVoice){
-      const nextLevel=existing.length+1; // 1=7th, 2=9th, 3=11th
-      subPetals.push({parentIdx,voiceLevel:nextLevel});
-      nextSubParent=(parentIdx+1)%petalCount;
-      render();
-      return;
+    const nextAltIdx=existing.length+1; // 0=root(parent), 1+=alternates
+    if(nextAltIdx>=alts.length){
+      nextSubParent=(parentIdx+1)%petalCount;tried++;continue;
     }
+    
+    const alt=alts[nextAltIdx];
+    subPetals.push({parentIdx, voiceLevel:parentVL, altIdx:nextAltIdx, altName:alt.name, altIntervals:alt.intervals});
     nextSubParent=(parentIdx+1)%petalCount;
-    tried++;
+    render();
+    // Preview the voicing
+    playChordIntervals(parentChord.root, alt.intervals);
+    return;
   }
-  // All parents have all voicings — do nothing
 }
 
 // Key selector popup
@@ -1103,9 +1206,10 @@ function render(){
     if(sp.parentIdx>=chords.length)return;
     const parentPos=packPositions[sp.parentIdx];
     if(!parentPos)return;
-    // Place sub-petals just beyond the parent, offset by voice level
+    // Place sub-petals just beyond the parent, offset by alt voicing index
     const pAngle=Math.atan2(parentPos.y,parentPos.x);
-    const angleOffset=(sp.voiceLevel-2)*0.35;
+    const altIdx=sp.altIdx||sp.voiceLevel||1;
+    const angleOffset=(altIdx-1)*0.4-0.2;
     const pDist=Math.sqrt(parentPos.x*parentPos.x+parentPos.y*parentPos.y);
     const subR=pDist+pR*1.1;
     const angle=pAngle+angleOffset;
@@ -1126,9 +1230,10 @@ function render(){
     el.dataset.subIndex=si;
     el._subData={sp,parentChord,si};
 
-    const voiceLabel=VOICING_LABELS[sp.voiceLevel]||'';
+    const voiceLabel=sp.altName||VOICING_LABELS[sp.voiceLevel]||'';
     const fontSize=Math.max(8,Math.round(pR*0.3*subPetalScale));
-    const newHTML=`<span class="petal-label" style="font-size:${fontSize}px">${showNames?parentChord.name+voiceLabel:voiceLabel}</span>`;
+    const displayName=showNames?parentChord.name+'\n'+voiceLabel:voiceLabel;
+    const newHTML=`<span class="petal-label" style="font-size:${fontSize}px;line-height:1.1">${displayName}</span>`;
     if(el._lastHTML!==newHTML){el.innerHTML=newHTML;el._lastHTML=newHTML;}
 
     if(!el._eventsAttached){
@@ -1137,9 +1242,14 @@ function render(){
         if(el._wasDragged)return;
         e.stopPropagation();
         const{sp:s,parentChord:pc}=el._subData;
-        const ext=VOICING_EXTENSIONS[pc.quality];
-        if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
-        else playChord(pc.root,pc.quality);
+        // Play alternate voicing intervals if available, otherwise fall back
+        if(s.altIntervals){
+          playChordIntervals(pc.root,s.altIntervals);
+        }else{
+          const ext=VOICING_EXTENSIONS[pc.quality];
+          if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
+          else playChord(pc.root,pc.quality);
+        }
         sendMIDIChord(pc.root,pc.quality);
         // Spring animation
         const baseT=el.style.transform.replace(/ scale\([^)]*\)/g,'');
