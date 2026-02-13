@@ -1855,8 +1855,12 @@ document.getElementById('center').addEventListener('touchend',(e)=>{
   render();
 });
 // Mouse wheel on center also changes scale (desktop)
+let _scaleWheelCooldown=false;
 document.getElementById('center').addEventListener('wheel',(e)=>{
   e.preventDefault();
+  if(_scaleWheelCooldown)return;
+  _scaleWheelCooldown=true;
+  setTimeout(()=>{_scaleWheelCooldown=false;},300);
   const idx=SCALE_TYPES.indexOf(currentScale);
   currentScale=SCALE_TYPES[(idx+(e.deltaY>0?1:-1)+SCALE_TYPES.length)%SCALE_TYPES.length];
   petalCustomOffsets={};selectedPetal=-1;
