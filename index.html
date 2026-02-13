@@ -2387,21 +2387,19 @@ function initDragSystem(){
     dragTarget=null;dragType=null;
   });
 
-  // Always clean up drag state on ANY pointerup (capture phase fires before stopPropagation)
+  // Fallback cleanup: if garden pointerup didn't fire (e.g. petal stopPropagation on non-drag tap)
+  // Use bubble phase with a microtask delay so garden handler runs first when it can
   document.addEventListener('pointerup',(e)=>{
-    if(dragTarget){
-      dragTarget.classList.remove('dragging');
-      dragTarget.style.transition='';dragTarget.style.opacity='1';
-      try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
-      if(!dragTarget._wasDragged){
-        // Simple tap — just clear state, don't re-render
+    setTimeout(()=>{
+      if(dragTarget){
+        // Garden handler didn't clean up — this was a tap that got stopPropagation'd
+        dragTarget.classList.remove('dragging');
+        dragTarget.style.transition='';dragTarget.style.opacity='1';
+        try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
         dragTarget=null;dragType=null;
-      } else {
-        dragTarget=null;dragType=null;
-        render();
       }
-    }
-  },true); // capture phase — fires before petal's stopPropagation
+    },0);
+  });
 }
 
 // ═══════════════════════════════════════════
