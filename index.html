@@ -2274,15 +2274,13 @@ function initDragSystem(){
     const petal=e.target.closest('.petal');
     const ring=e.target.closest('.rotation-ring');
     if(petal){
-      dragTarget=petal;
-      dragType=petal.dataset.subIndex!==undefined?'subpetal':'petal';
+      // Don't set dragTarget yet — wait for movement threshold in pointermove.
+      // This prevents taps from entering drag state on desktop.
+      _pendingDrag={el:petal,type:petal.dataset.subIndex!==undefined?'subpetal':'petal',pointerId:e.pointerId};
       petal._wasDragged=false;
       petal._dragCaptured=false;
       petal._pointerId=e.pointerId;
       const p=getPos(e);startX=p.x;startY=p.y;
-      // Don't setPointerCapture or preventDefault here — 
-      // doing so on iOS suppresses the click event.
-      // We'll capture only once actual drag movement is detected.
     }else if(ring){
       dragType='ring';dragTarget=ring;
       const p=getPos(e);const r=gardenRect();
@@ -2293,22 +2291,29 @@ function initDragSystem(){
     }
   });
 
+  let _pendingDrag=null;
   garden.addEventListener('pointermove',(e)=>{
+    // Promote pending drag to active once threshold met
+    if(_pendingDrag&&!dragTarget){
+      const p=getPos(e);
+      const dx=p.x-startX,dy=p.y-startY;
+      if(Math.abs(dx)+Math.abs(dy)>8){
+        dragTarget=_pendingDrag.el;
+        dragType=_pendingDrag.type;
+        dragTarget._wasDragged=true;
+        dragTarget._dragCaptured=true;
+        dragTarget.classList.add('dragging');
+        try{dragTarget.setPointerCapture(_pendingDrag.pointerId);}catch(x){}
+        _pendingDrag=null;
+      }else{
+        return; // below threshold, don't start drag
+      }
+    }
     if(!dragTarget)return;
     e.preventDefault();
     const p=getPos(e);
     if(dragType==='petal'||dragType==='subpetal'){
-      const dx=p.x-startX,dy=p.y-startY;
-      if(Math.abs(dx)+Math.abs(dy)>5){
-        dragTarget._wasDragged=true;
-        // Capture pointer and start visual drag only once threshold exceeded
-        if(!dragTarget._dragCaptured){
-          dragTarget._dragCaptured=true;
-          dragTarget.classList.add('dragging');
-          try{dragTarget.setPointerCapture(dragTarget._pointerId);}catch(e){}
-        }
-      }
-      if(!dragTarget._wasDragged)return; // Don't move petal until drag threshold met
+      if(!dragTarget._wasDragged)return;
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
       const lx=p.x-r.left,ly=p.y-r.top;
@@ -2337,6 +2342,7 @@ function initDragSystem(){
 
   // Also handle pointercancel (e.g. browser takes over gesture)
   garden.addEventListener('pointercancel',(e)=>{
+    _pendingDrag=null;
     if(dragTarget){
       dragTarget.classList.remove('dragging');
       dragTarget.style.transition='';dragTarget.style.opacity='1';
@@ -2387,19 +2393,10 @@ function initDragSystem(){
     dragTarget=null;dragType=null;
   });
 
-  // Fallback cleanup: if garden pointerup didn't fire (e.g. petal stopPropagation on non-drag tap)
-  // Use bubble phase with a microtask delay so garden handler runs first when it can
-  document.addEventListener('pointerup',(e)=>{
-    setTimeout(()=>{
-      if(dragTarget){
-        // Garden handler didn't clean up — this was a tap that got stopPropagation'd
-        dragTarget.classList.remove('dragging');
-        dragTarget.style.transition='';dragTarget.style.opacity='1';
-        try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
-        dragTarget=null;dragType=null;
-      }
-    },0);
-  });
+  // Clear pending drag on any pointerup (tap without drag)
+  document.addEventListener('pointerup',()=>{
+    _pendingDrag=null;
+  },true);
 }
 
 // ═══════════════════════════════════════════
