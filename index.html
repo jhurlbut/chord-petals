@@ -370,8 +370,12 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <div class="midi-row">
     <div><label>Channel</label><select id="midiCh"></select></div>
   </div>
-  <label class="midi-toggle">Send MIDI on tap<input type="checkbox" id="midiSendToggle" checked><span class="sw"></span></label>
-  <label class="midi-toggle">Auto-navigate on input<input type="checkbox" id="midiNavToggle"><span class="sw"></span></label>
+  <label class="midi-toggle"><input type="checkbox" id="midiSendToggle" checked><span class="sw"></span>Send MIDI on tap</label>
+  <label class="midi-toggle"><input type="checkbox" id="midiNavToggle"><span class="sw"></span>Auto-navigate on input</label>
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin:10px 0 6px"></div>
+  <label>Bluetooth MIDI</label>
+  <button class="voice-opt" id="bleMidiBtn" onclick="connectBLEMIDI()" style="width:100%;margin-bottom:6px">🔗 Connect BLE Device</button>
+  <div id="bleMidiStatus" style="font-size:10px;color:var(--text-dim);min-height:14px"></div>
   <div class="midi-note" id="midiNote"></div>
 </div>
 
@@ -1916,6 +1920,152 @@ function detectChordFromMIDI(){
 }
 
 initMIDI();
+
+// ═══════════════════════════════════════════
+// BLUETOOTH MIDI (BLE MIDI)
+// ═══════════════════════════════════════════
+const BLE_MIDI_SERVICE='03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+const BLE_MIDI_CHAR='7772e5db-3868-4112-a1a9-f2669d106bf3';
+let bleDevice=null, bleChar=null, bleMidiConnected=false;
+
+function setBLEStatus(msg,ok){
+  const el=document.getElementById('bleMidiStatus');
+  el.textContent=msg;
+  el.style.color=ok?'#3DADD9':'var(--text-dim)';
+  document.getElementById('bleMidiBtn').textContent=bleMidiConnected?'⏏ Disconnect BLE':'🔗 Connect BLE Device';
+}
+
+async function connectBLEMIDI(){
+  // If already connected, disconnect
+  if(bleMidiConnected&&bleDevice){
+    bleDevice.gatt.disconnect();
+    bleMidiConnected=false;
+    bleChar=null;
+    setBLEStatus('Disconnected');
+    return;
+  }
+  
+  if(!navigator.bluetooth){
+    setBLEStatus('Bluetooth not available on this browser');
+    return;
+  }
+  
+  try{
+    setBLEStatus('Scanning…');
+    bleDevice=await navigator.bluetooth.requestDevice({
+      filters:[{services:[BLE_MIDI_SERVICE]}],
+      optionalServices:[BLE_MIDI_SERVICE]
+    });
+    
+    bleDevice.addEventListener('gattserverdisconnected',()=>{
+      bleMidiConnected=false;
+      bleChar=null;
+      setBLEStatus('Disconnected');
+    });
+    
+    setBLEStatus('Connecting…');
+    const server=await bleDevice.gatt.connect();
+    const service=await server.getPrimaryService(BLE_MIDI_SERVICE);
+    bleChar=await service.getCharacteristic(BLE_MIDI_CHAR);
+    
+    // Enable notifications for incoming MIDI
+    await bleChar.startNotifications();
+    bleChar.addEventListener('characteristicvaluechanged',onBLEMIDIMessage);
+    
+    bleMidiConnected=true;
+    setBLEStatus('✓ '+bleDevice.name,true);
+    
+    // Also add as MIDI output option
+    populateMIDIDevices();
+  }catch(e){
+    if(e.name==='NotFoundError'){
+      setBLEStatus('No device selected');
+    }else{
+      console.error('BLE MIDI error:',e);
+      setBLEStatus('Error: '+e.message);
+    }
+  }
+}
+
+// Parse BLE MIDI packet (BLE MIDI spec: timestamp header + MIDI bytes)
+function onBLEMIDIMessage(event){
+  const data=new Uint8Array(event.target.value.buffer);
+  if(data.length<3)return;
+  // BLE MIDI packet: [header, timestamp, status, data1, data2, ...]
+  // Header byte has bit 7 set, timestamp byte has bit 7 set
+  let i=0;
+  // Skip header byte
+  if(data[i]&0x80)i++;
+  
+  let runningStatus=0;
+  while(i<data.length){
+    // Skip timestamp bytes (bit 7 set, but not a status byte in context)
+    if(data[i]&0x80&&i<data.length-1){
+      // Could be timestamp or status byte
+      const b=data[i];
+      if((b&0xF0)>=0x80&&(b&0xF0)<=0xE0){
+        // It's a MIDI status byte
+        runningStatus=b;
+        i++;
+      }else{
+        // Timestamp byte, skip
+        i++;
+        continue;
+      }
+    }
+    
+    if(!runningStatus)break;
+    const cmd=runningStatus&0xF0;
+    
+    if(cmd===0x90||cmd===0x80){
+      if(i+1>=data.length)break;
+      const note=data[i]&0x7F;
+      const vel=data[i+1]&0x7F;
+      i+=2;
+      
+      // Route to existing MIDI input handler
+      if(cmd===0x90&&vel>0)midiHeldNotes.add(note);
+      else midiHeldNotes.delete(note);
+      detectChordFromMIDI();
+      
+      // Show in MIDI note display
+      const el=document.getElementById('midiNote');
+      el.textContent='BLE: '+noteName(note%12,true)+(Math.floor(note/12)-1)+' vel:'+vel;
+    }else{
+      // Skip other message types (2 data bytes for most)
+      i+=2;
+    }
+  }
+}
+
+// Send MIDI data over BLE
+function sendBLEMIDI(bytes){
+  if(!bleChar||!bleMidiConnected)return;
+  // BLE MIDI packet: [header, timestamp, ...midi bytes]
+  const ts=Date.now()&0x1FFF; // 13-bit timestamp
+  const header=0x80|((ts>>7)&0x3F);
+  const tsLow=0x80|(ts&0x7F);
+  const packet=new Uint8Array([header,tsLow,...bytes]);
+  bleChar.writeValueWithoutResponse(packet).catch(e=>console.warn('BLE send error:',e));
+}
+
+// Patch sendMIDIChord to also send over BLE
+const _origSendMIDIChord=sendMIDIChord;
+sendMIDIChord=function(rootNote,quality){
+  _origSendMIDIChord(rootNote,quality);
+  if(!bleMidiConnected||!bleChar)return;
+  if(!document.getElementById('midiSendToggle').checked)return;
+  const ch=parseInt(document.getElementById('midiCh').value)||1;
+  const statusOn=0x90+(ch-1),statusOff=0x80+(ch-1);
+  const intervals=QUALITY[quality]?.intervals||[0,4,7];
+  const base=60+rootNote;
+  const notes=intervals.map(i=>base+i);
+  // Send note-ons
+  notes.forEach(n=>sendBLEMIDI([statusOn,n,100]));
+  // Schedule note-offs
+  setTimeout(()=>{notes.forEach(n=>sendBLEMIDI([statusOff,n,0]));},500);
+};
+
 // Debounced resize handler
 let _resizeRAF=0;
 function onResize(){
