@@ -304,6 +304,15 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <label>Continuous</label>
     <label class="midi-toggle"><input type="checkbox" id="improvContToggle" onchange="setImprovContinuous(this.checked)"><span class="sw"></span>Loop &amp; interpolate between chords</label>
   </div>
+  <label>Accompaniment Sound</label>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+    <button class="voice-opt" data-improv-synth="warm" onclick="setImprovSynth('warm')">Warm</button>
+    <button class="voice-opt" data-improv-synth="bright" onclick="setImprovSynth('bright')">Bright</button>
+    <button class="voice-opt active" data-improv-synth="pad" onclick="setImprovSynth('pad')">Pad</button>
+    <button class="voice-opt" data-improv-synth="keys" onclick="setImprovSynth('keys')">Keys</button>
+    <button class="voice-opt" data-improv-synth="pluck" onclick="setImprovSynth('pluck')">Pluck</button>
+    <button class="voice-opt" data-improv-synth="organ" onclick="setImprovSynth('organ')">Organ</button>
+  </div>
   <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">100bpm</span></label>
   <input type="range" min="60" max="200" step="10" value="100" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
   <label>Length: <span id="improvStepsVal" style="color:var(--text)">2 bars</span></label>
@@ -646,8 +655,8 @@ function applyVoicing(intervals){
 }
 
 // Play a single note with the synth engine
-function playNote(ctx,freq,startTime,noteGain,duration){
-  const p=SYNTH_PRESETS[synthPreset]||SYNTH_PRESETS.warm;
+function playNote(ctx,freq,startTime,noteGain,duration,presetOverride){
+  const p=SYNTH_PRESETS[presetOverride||synthPreset]||SYNTH_PRESETS.warm;
   const attack=p.attack,decay=p.decay,sustain=p.sustain,release=Math.min(p.release,duration*0.5);
   const total=duration;
   const vGain=ctx.createGain();
@@ -767,6 +776,7 @@ let improvTemperature=1.1;
 let improvGain=0.08;
 let improvOctave=-1;
 let improvModel='rnn'; // 'rnn' or 'vae'
+let improvSynth='pad'; // synth preset for accompaniment (default different from chord)
 let improvContinuous=false; // loop continuously
 let _lastVAESequence=null; // last generated VAE sequence (for interpolation)
 let _lastChordSym=null; // last chord symbol used
@@ -853,6 +863,7 @@ function setImprovContinuous(v){
   improvContinuous=v;
   if(!v){_continuousChord=null;}
 }
+function setImprovSynth(s){improvSynth=s;document.querySelectorAll('[data-improv-synth]').forEach(b=>b.classList.toggle('active',b.dataset.improvSynth===s));}
 function setImprovTempo(v){improvTempo=+v;document.getElementById('improvTempoVal').textContent=v+'bpm';}
 function setImprovSteps(v){improvSteps=+v;const labels={8:'½ bar',16:'1 bar',32:'2 bars',64:'4 bars'};document.getElementById('improvStepsVal').textContent=labels[v]||v+' steps';}
 function setImprovTemp(v){improvTemperature=+v;const labels={'0.5':'Conservative','0.8':'Gentle','1.1':'Balanced','1.5':'Wild','2.0':'Chaotic'};document.getElementById('improvTempVal').textContent=labels[v]||v;}
@@ -914,7 +925,7 @@ function playImprovSequence(result, onEnd){
     
     const t=setTimeout(()=>{
       if(!improvPlaying)return;
-      playNote(ctx,freq,ctx.currentTime,improvGain,Math.max(0.1,dur));
+      playNote(ctx,freq,ctx.currentTime,improvGain,Math.max(0.1,dur),improvSynth);
     },startMs);
     improvTimers.push(t);
   });
