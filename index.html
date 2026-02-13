@@ -269,6 +269,14 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="voice-opt" data-synth="pluck" onclick="setSynth('pluck')">Pluck</button>
     <button class="voice-opt" data-synth="organ" onclick="setSynth('organ')">Organ</button>
   </div>
+  <label style="font-size:0.7em;opacity:0.6;margin-top:2px" id="sonicPiSynthLabel">⚡ Sonic Pi</label>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;opacity:0.4;transition:opacity 0.3s" id="sonicPiSynthGroup">
+    <button class="voice-opt" data-synth="sp-prophet" onclick="setSynth('sp-prophet')">Prophet</button>
+    <button class="voice-opt" data-synth="sp-blade" onclick="setSynth('sp-blade')">Blade</button>
+    <button class="voice-opt" data-synth="sp-dark_ambience" onclick="setSynth('sp-dark_ambience')">Dark Amb</button>
+    <button class="voice-opt" data-synth="sp-piano" onclick="setSynth('sp-piano')">Piano</button>
+    <button class="voice-opt" data-synth="sp-pretty_bell" onclick="setSynth('sp-pretty_bell')">Bell</button>
+  </div>
   <label>Bass Root</label>
   <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>Play root in bass octave</label>
   <label>Voicing</label>
@@ -612,7 +620,15 @@ const SONIC_SYNTH_MAP={
   keys:'sonic-pi-piano',
   pluck:'sonic-pi-pluck',
   organ:'sonic-pi-pretty_bell',
+  // Direct Sonic Pi synth presets (selectable in UI)
+  'sp-prophet':'sonic-pi-prophet',
+  'sp-blade':'sonic-pi-blade',
+  'sp-dark_ambience':'sonic-pi-dark_ambience',
+  'sp-piano':'sonic-pi-piano',
+  'sp-pretty_bell':'sonic-pi-pretty_bell',
 };
+// Which presets are Sonic Pi–native (require SuperSonic)
+const SONIC_PI_PRESETS=new Set(['sp-prophet','sp-blade','sp-dark_ambience','sp-piano','sp-pretty_bell']);
 const SONIC_SYNTHDEFS_TO_LOAD=Object.values(SONIC_SYNTH_MAP).filter((v,i,a)=>a.indexOf(v)===i);
 
 async function initSuperSonic(){
@@ -670,6 +686,9 @@ async function initSuperSonic(){
     await Promise.race([sonic.sync(), mkTimeout(10000)]);
     sonicReady=true;
     sonicLoading=false;
+    // Enable Sonic Pi synth buttons
+    const spGroup=document.getElementById('sonicPiSynthGroup');
+    if(spGroup)spGroup.style.opacity='1';
     // Resume SuperSonic's internal AudioContext (may be suspended on iOS)
     const ssCtx=sonic.node?.context;
     if(ssCtx&&ssCtx.state==='suspended') await ssCtx.resume();
@@ -750,14 +769,16 @@ function resumeAudioCtx(){
   if(audioCtx.state==='suspended'){
     audioCtx.resume().catch(()=>{});
   }
-  // If returning from background, force recreate the audio context
+  // If returning from background, force recreate audio + SuperSonic
   if(audioNeedsRestart){
     audioNeedsRestart=false;
-    if(audioCtx.state==='suspended'){
-      try{audioCtx.close();}catch(e){}
-      audioCtx=null;masterGain=null;reverbNode=null;
-      getAudio(); // recreate fresh
-    }
+    // Always tear down and rebuild — iOS kills WASM AudioWorklet nodes
+    // even when ctx.state reports 'running' after resume
+    sonic=null;sonicReady=false;sonicLoading=false;
+    try{audioCtx.close();}catch(e){}
+    audioCtx=null;masterGain=null;reverbNode=null;
+    getAudio();
+    initSuperSonic();
   }
 }
 // Pre-create AudioContext on first user gesture + boot SuperSonic
@@ -2113,6 +2134,16 @@ function toggleBass(v){bassRoot=v;}
 function previewChord(){playChord(currentRoot,'major');}
 function setSynth(s){
   synthPreset=s;
+  // If picking a Sonic Pi preset, force SuperSonic mode; warn if not ready
+  if(SONIC_PI_PRESETS.has(s)){
+    if(!sonicReady){
+      // Boot SuperSonic if not already running
+      if(!sonicLoading)initSuperSonic();
+    }
+    window._useWebAudio=false;
+    const badge=document.getElementById('engineBadge');
+    if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';}
+  }
   document.querySelectorAll('[data-synth]').forEach(b=>b.classList.toggle('active',b.dataset.synth===s));
   previewChord();
 }
