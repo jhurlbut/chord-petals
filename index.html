@@ -2066,9 +2066,23 @@ function render(){
       // Use pointerup instead of click — iOS Safari suppresses click
       // on elements with pointerdown handlers
       el.addEventListener('pointerup',(e)=>{
-        if(el._wasDragged)return;
+        if(el._wasDragged){
+          // If armed for root, clear on next tap cycle
+          return;
+        }
         e.stopPropagation();
         const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
+        // If this petal is armed for root change, confirm navigation
+        if(el._armedForRoot){
+          el._armedForRoot=false;
+          el.style.boxShadow='';
+          setRoot(c.root,c.name);
+          return;
+        }
+        // Clear any other armed petals
+        document.querySelectorAll('.petal').forEach(p=>{
+          if(p._armedForRoot){p._armedForRoot=false;p.style.boxShadow='';}
+        });
         selectedPetal=idx===selectedPetal?-1:idx;
         // Send MIDI immediately (don't wait for audio)
         sendMIDIChord(c.root,c.quality);
@@ -2091,26 +2105,19 @@ function render(){
         setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform=baseT;render();},550);
       });
 
-      let tapC=0,tapT,longPressT;
+      let longPressT;
       el.addEventListener('pointerdown',(ev)=>{
-        el._wasDragged=false; // reset from previous long-press
+        el._wasDragged=false;
         const{ch:c,i:idx}=el._chordData;
-        tapC++;
-        if(tapC===2){
-          clearTimeout(tapT);tapC=0;
-          if(!lockRoot)setRoot(c.root,c.name);
-          else{delete petalCustomOffsets[idx];render();}
-          return;
-        }
-        tapT=setTimeout(()=>tapC=0,350);
+        // Long-press: arm this petal for root navigation
         longPressT=setTimeout(()=>{
-          const cur=petalVoicings[idx]||0;
-          petalVoicings[idx]=(cur+1)%4;
-          el._wasDragged=true; // suppress pointerup sound after long-press
-          render();
-          const vl2=petalVoicings[idx];
-          const ext2=VOICING_EXTENSIONS[c.quality];
-          if(ext2&&ext2[vl2])playChordIntervals(c.root,ext2[vl2]);
+          el._wasDragged=true; // suppress pointerup sound
+          if(!lockRoot){
+            // Arm for root change — highlight petal and wait for confirm tap
+            el._armedForRoot=true;
+            el.style.boxShadow='0 0 0 3px #F2506E, 0 0 12px rgba(242,80,110,0.5)';
+            el.style.transition='box-shadow 0.2s';
+          }
         },500);
       });
       el.addEventListener('pointerup',()=>clearTimeout(longPressT));
