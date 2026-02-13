@@ -287,6 +287,11 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div class="midi-panel" id="improvPanel">
   <h3>🎵 AI Improvisation</h3>
   <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable improvisation</label>
+  <label>Model</label>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
+    <button class="voice-opt active" data-improv-model="rnn" onclick="setImprovModel('rnn')">ImprovRNN</button>
+    <button class="voice-opt" data-improv-model="vae" onclick="setImprovModel('vae')">MelodyVAE</button>
+  </div>
   <label>Tempo: <span id="improvTempoVal" style="color:var(--text)">100bpm</span></label>
   <input type="range" min="60" max="200" step="10" value="100" style="width:100%;margin-bottom:8px" oninput="setImprovTempo(this.value)">
   <label>Length: <span id="improvStepsVal" style="color:var(--text)">2 bars</span></label>
@@ -741,31 +746,47 @@ function playChordIntervals(rootNote,intervals){
 // MAGENTA.JS — AI IMPROVISATION
 // ═══════════════════════════════════════════
 let improvEnabled=false;
-let improvRNN=null;
-let improvLoading=false;
 let improvPlaying=false;
 let improvTimers=[];
 // Improv settings
-let improvTempo=100;       // BPM for playback
-let improvSteps=32;        // steps to generate (8=half bar, 16=1bar, 32=2bars, 64=4bars)
-let improvTemperature=1.1; // randomness (0.5=conservative, 1.0=balanced, 1.5=wild)
-let improvGain=0.08;       // volume (softer than chords)
-let improvOctave=-1;       // octave shift (-2 to +2, default -1 for lower than chord)
+let improvTempo=100;
+let improvSteps=32;
+let improvTemperature=1.1;
+let improvGain=0.08;
+let improvOctave=-1;
+let improvModel='rnn'; // 'rnn' or 'vae'
 
-const IMPROV_CHECKPOINT='https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/chord_pitches_improv';
+// Model instances (lazy-loaded)
+let _improvRNN=null, _improvVAE=null, _improvLoading=false;
 
-async function initImprovRNN(){
-  if(improvRNN)return improvRNN;
-  if(improvLoading)return null;
-  improvLoading=true;
+const CHECKPOINTS={
+  rnn:'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/chord_pitches_improv',
+  vae:'https://storage.googleapis.com/magentadata/js/checkpoints/music_vae/mel_chords'
+};
+
+async function getImprovModel(){
+  if(improvModel==='vae'){
+    if(_improvVAE)return _improvVAE;
+  }else{
+    if(_improvRNN)return _improvRNN;
+  }
+  if(_improvLoading)return null;
+  _improvLoading=true;
   try{
-    improvRNN=new mm.MusicRNN(IMPROV_CHECKPOINT);
-    await improvRNN.initialize();
-    improvLoading=false;
-    return improvRNN;
+    if(improvModel==='vae'){
+      _improvVAE=new mm.MusicVAE(CHECKPOINTS.vae);
+      await _improvVAE.initialize();
+      _improvLoading=false;
+      return _improvVAE;
+    }else{
+      _improvRNN=new mm.MusicRNN(CHECKPOINTS.rnn);
+      await _improvRNN.initialize();
+      _improvLoading=false;
+      return _improvRNN;
+    }
   }catch(e){
     console.error('Magenta init failed:',e);
-    improvLoading=false;
+    _improvLoading=false;
     return null;
   }
 }
@@ -773,20 +794,25 @@ async function initImprovRNN(){
 function toggleImprov(){
   const panel=document.getElementById('improvPanel');
   panel.classList.toggle('open');
-  // Close other panels
   document.getElementById('voicePanel').classList.remove('open');
   document.getElementById('midiPanel').classList.remove('open');
 }
 function setImprovEnabled(v){
   improvEnabled=v;
   document.getElementById('improvBtn').classList.toggle('active',improvEnabled);
-  if(improvEnabled&&!improvRNN&&!improvLoading){
-    initImprovRNN().then(rnn=>{
-      if(!rnn){improvEnabled=false;document.getElementById('improvToggle').checked=false;}
+  if(improvEnabled){
+    getImprovModel().then(m=>{
+      if(!m){improvEnabled=false;document.getElementById('improvToggle').checked=false;}
       document.getElementById('improvBtn').classList.toggle('active',improvEnabled);
     });
   }
   if(!improvEnabled)stopImprov();
+}
+function setImprovModel(m){
+  improvModel=m;
+  document.querySelectorAll('[data-improv-model]').forEach(b=>b.classList.toggle('active',b.dataset.improvModel===m));
+  // Pre-load selected model if improv is enabled
+  if(improvEnabled)getImprovModel();
 }
 function setImprovTempo(v){improvTempo=+v;document.getElementById('improvTempoVal').textContent=v+'bpm';}
 function setImprovSteps(v){improvSteps=+v;const labels={8:'½ bar',16:'1 bar',32:'2 bars',64:'4 bars'};document.getElementById('improvStepsVal').textContent=labels[v]||v+' steps';}
@@ -836,19 +862,30 @@ function makeSeedSequence(rootIdx, quality){
 async function improviseOverChord(rootIdx, quality, playChordFn){
   if(!improvEnabled||!soundOn)return;
   stopImprov();
-  const rnn=await initImprovRNN();
-  if(!rnn){if(playChordFn)playChordFn();return;}
+  const model=await getImprovModel();
+  if(!model){if(playChordFn)playChordFn();return;}
   
   improvPlaying=true;
   const chordSym=chordToMagentaSymbol(rootIdx,quality);
   const seed=makeSeedSequence(rootIdx,quality);
   
   try{
-    const stepsToGen=improvSteps;
+    let result;
     const temperature=improvTemperature;
-    const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
     
-    const result=await rnn.continueSequence(seed, stepsToGen, temperature, chordProg);
+    if(improvModel==='vae'){
+      // MusicVAE mel_chords: sample a 2-bar melody conditioned on chords
+      // mel_chords uses 32 steps (2 bars at 4 steps/quarter in 4/4)
+      const chordProg=[chordSym,chordSym]; // one chord per bar
+      const samples=await model.sample(1, temperature, chordProg);
+      result=samples[0];
+    }else{
+      // MusicRNN chord_pitches_improv: continue sequence conditioned on chords
+      const stepsToGen=improvSteps;
+      const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
+      result=await model.continueSequence(seed, stepsToGen, temperature, chordProg);
+    }
+    
     if(!improvPlaying){if(playChordFn)playChordFn();return;}
     
     // Play chord and improv at the same instant
@@ -863,7 +900,6 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
       if(!improvPlaying)return;
       const startMs=(note.quantizedStartStep*stepDur)*1000;
       const dur=(note.quantizedEndStep-note.quantizedStartStep)*stepDur;
-      // Apply octave shift to bring melody lower/higher
       const shiftedPitch=note.pitch+(improvOctave*12);
       const freq=440*Math.pow(2,(shiftedPitch-69)/12);
       
@@ -874,7 +910,6 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
       improvTimers.push(t);
     });
     
-    // Auto-stop after sequence ends
     const totalMs=(result.totalQuantizedSteps*stepDur)*1000+500;
     const endT=setTimeout(()=>{improvPlaying=false;},totalMs);
     improvTimers.push(endT);
