@@ -755,7 +755,7 @@ function stopImprov(){
 // Convert chord name to Magenta-compatible chord symbol (e.g. "Cm", "F", "Dm7", "G7")
 function chordToMagentaSymbol(rootIdx, quality){
   const name=noteName(rootIdx,true);
-  const suffixMap={major:'',minor:'m',dim:'dim',aug:'aug',dom7:'7',maj7:'M',min7:'m',halfdim:'m7b5'};
+  const suffixMap={major:'',minor:'m',dim:'dim',aug:'aug',dom7:'7',maj7:'maj7',min7:'m7',halfdim:'m7b5'};
   return name+(suffixMap[quality]||'');
 }
 
@@ -763,18 +763,25 @@ function chordToMagentaSymbol(rootIdx, quality){
 function makeSeedSequence(rootIdx, quality){
   const intervals=QUALITY[quality]?.intervals||[0,4,7];
   const baseNote=60+rootIdx; // MIDI note (C4=60)
-  const notes=intervals.map(i=>baseNote+i);
-  // 4 quarter notes as seed
-  const noteSeq={
-    notes: notes.slice(0,4).map((pitch,i)=>({
-      pitch: Math.min(83,Math.max(48,pitch)), // clamp to model range 48-83
-      quantizedStartStep: i,
-      quantizedEndStep: i+1,
-    })),
-    quantizationInfo: {stepsPerQuarter:1},
-    totalQuantizedSteps: Math.min(4,notes.length),
+  const pitches=intervals.map(i=>baseNote+i);
+  // Pad to 4 notes by repeating octave-up root if needed
+  while(pitches.length<4) pitches.push(pitches[0]+12);
+  // Create unquantized NoteSequence, then quantize properly
+  const qpm=120;
+  const beatDur=60/qpm; // 0.5s per quarter at 120bpm
+  const unquantized={
+    ticksPerQuarter:220,
+    totalTime: 4*beatDur,
+    timeSignatures:[{time:0,numerator:4,denominator:4}],
+    tempos:[{time:0,qpm:qpm}],
+    notes: pitches.slice(0,4).map((pitch,i)=>({
+      pitch: Math.min(83,Math.max(48,pitch)),
+      startTime: i*beatDur,
+      endTime: (i+1)*beatDur,
+      instrument:0, program:0, velocity:100, isDrum:false
+    }))
   };
-  return noteSeq;
+  return mm.sequences.quantizeNoteSequence(unquantized, 4);
 }
 
 // Generate and play an improvisation over a chord
@@ -792,8 +799,8 @@ async function improviseOverChord(rootIdx, quality){
     // Generate 32 steps (~2 bars) conditioned on the chord
     const stepsToGen=32;
     const temperature=1.1;
-    // Chord progression: repeat the same chord for all steps
-    const chordProg=Array(Math.ceil(stepsToGen/4)).fill(chordSym);
+    // Chord progression: one chord symbol per bar (16 steps at 4 steps/quarter in 4/4)
+    const chordProg=Array(Math.ceil(stepsToGen/16)).fill(chordSym);
     
     const result=await rnn.continueSequence(seed, stepsToGen, temperature, chordProg);
     if(!improvPlaying)return; // stopped while generating
