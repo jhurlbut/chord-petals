@@ -648,9 +648,12 @@ async function initSuperSonic(){
       synthdefBaseURL:'https://unpkg.com/supersonic-scsynth-synthdefs@latest/synthdefs/',
       sampleBaseURL:'https://unpkg.com/supersonic-scsynth-samples@latest/samples/',
     });
+    sonic.on&&sonic.on('error',(e)=>console.error('SuperSonic event error:',e));
     console.log('SuperSonic: calling init()…');
     if(badge){badge.textContent='⏳ Booting…';}
-    await Promise.race([sonic.init(), mkTimeout(15000)]);
+    const initResult=sonic.init();
+    initResult.catch(e=>console.error('SuperSonic init rejected:',e));
+    await Promise.race([initResult, mkTimeout(15000)]);
     console.log('SuperSonic: loading synthdefs…');
     if(badge){badge.textContent='⏳ Synths…';}
     await Promise.race([sonic.loadSynthDefs(SONIC_SYNTHDEFS_TO_LOAD), mkTimeout(15000)]);
@@ -665,6 +668,12 @@ async function initSuperSonic(){
     if(sonic){try{sonic.shutdown();}catch(x){}}
     sonic=null;sonicReady=false;sonicLoading=false;
     if(badge){badge.textContent='Web Audio';badge.title='SuperSonic error: '+errMsg;badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
+    // Show error visually for debugging on mobile
+    const errDiv=document.createElement('div');
+    errDiv.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#300;color:#f88;font:10px monospace;padding:4px 8px;z-index:9999;max-height:80px;overflow:auto;';
+    errDiv.textContent='SS err: '+errMsg;
+    document.body.appendChild(errDiv);
+    setTimeout(()=>errDiv.remove(),15000);
   }
 }
 
