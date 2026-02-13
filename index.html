@@ -882,6 +882,7 @@ function setImprovOctave(d){improvOctave=Math.max(-2,Math.min(2,improvOctave+d))
 function stopImprov(){
   improvPlaying=false;
   _continuousChord=null;
+  stopScheduler();
   improvTimers.forEach(t=>clearTimeout(t));
   improvTimers=[];
 }
@@ -918,32 +919,90 @@ function makeSeedSequence(rootIdx, quality){
   return mm.sequences.quantizeNoteSequence(unquantized, 4);
 }
 
-// Schedule and play a generated NoteSequence through our synth
+// ── Lookahead Scheduler (sample-accurate timing) ──
+// Based on Chris Wilson's "A Tale of Two Clocks" pattern.
+// A JS interval runs frequently and schedules notes into Web Audio's
+// future using ctx.currentTime, giving sample-accurate timing without
+// setTimeout jitter.
+
+const SCHED_LOOKAHEAD=0.1;  // seconds to look ahead
+const SCHED_INTERVAL=25;    // ms between scheduler ticks
+
+let _schedQueue=[];       // [{audioTime, freq, gain, dur, preset}]
+let _schedTimer=null;
+let _schedEndTime=0;      // audioTime when current sequence ends
+let _schedOnEnd=null;     // callback when sequence finishes
+let _schedStartTime=0;    // audioTime when current sequence started
+
+function startScheduler(){
+  if(_schedTimer)return;
+  _schedTimer=setInterval(schedulerTick,SCHED_INTERVAL);
+}
+
+function stopScheduler(){
+  if(_schedTimer){clearInterval(_schedTimer);_schedTimer=null;}
+  _schedQueue=[];
+  _schedOnEnd=null;
+}
+
+function schedulerTick(){
+  const ctx=audioCtx;
+  if(!ctx||!improvPlaying){stopScheduler();return;}
+  const now=ctx.currentTime;
+  const horizon=now+SCHED_LOOKAHEAD;
+  
+  // Schedule any notes within the lookahead window
+  while(_schedQueue.length>0&&_schedQueue[0].audioTime<=horizon){
+    const n=_schedQueue.shift();
+    if(n.audioTime<now-0.05)continue; // skip notes too far in the past
+    playNote(ctx,n.freq,Math.max(now,n.audioTime),n.gain,n.dur,n.preset);
+  }
+  
+  // Check if sequence has ended
+  if(_schedQueue.length===0&&now>=_schedEndTime-0.05){
+    const cb=_schedOnEnd;
+    _schedOnEnd=null;
+    stopScheduler();
+    if(cb)cb();
+  }
+}
+
+// Queue a NoteSequence for sample-accurate playback
+// startAtAudioTime: the ctx.currentTime at which beat 0 should play
+function scheduleSequence(result, startAtAudioTime, onEnd){
+  const ctx=getAudio();
+  if(!ctx){if(onEnd)onEnd();return;}
+  
+  const bpm=improvTempo;
+  const stepDur=60/(bpm*4); // duration of one step (16th note)
+  const baseTime=startAtAudioTime||ctx.currentTime;
+  
+  // Build sorted queue of notes
+  const notes=[];
+  result.notes.forEach(note=>{
+    const audioTime=baseTime+(note.quantizedStartStep*stepDur);
+    const dur=Math.max(0.1,(note.quantizedEndStep-note.quantizedStartStep)*stepDur);
+    const shiftedPitch=note.pitch+(improvOctave*12);
+    const freq=440*Math.pow(2,(shiftedPitch-69)/12);
+    notes.push({audioTime, freq, gain:improvGain, dur, preset:improvSynth});
+  });
+  notes.sort((a,b)=>a.audioTime-b.audioTime);
+  
+  _schedQueue=notes;
+  _schedEndTime=baseTime+(result.totalQuantizedSteps*stepDur);
+  _schedOnEnd=onEnd;
+  _schedStartTime=baseTime;
+  startScheduler();
+  
+  // Return the end time so continuous mode can pre-schedule the next phrase
+  return _schedEndTime;
+}
+
+// Legacy wrapper for non-scheduler callers
 function playImprovSequence(result, onEnd){
   const ctx=getAudio();
   if(!ctx){if(onEnd)onEnd();return;}
-  const bpm=improvTempo;
-  const stepDur=60/(bpm*4);
-  
-  result.notes.forEach(note=>{
-    if(!improvPlaying)return;
-    const startMs=(note.quantizedStartStep*stepDur)*1000;
-    const dur=(note.quantizedEndStep-note.quantizedStartStep)*stepDur;
-    const shiftedPitch=note.pitch+(improvOctave*12);
-    const freq=440*Math.pow(2,(shiftedPitch-69)/12);
-    
-    const t=setTimeout(()=>{
-      if(!improvPlaying)return;
-      playNote(ctx,freq,ctx.currentTime,improvGain,Math.max(0.1,dur),improvSynth);
-    },startMs);
-    improvTimers.push(t);
-  });
-  
-  const totalMs=(result.totalQuantizedSteps*stepDur)*1000;
-  const endT=setTimeout(()=>{
-    if(onEnd)onEnd();
-  },totalMs);
-  improvTimers.push(endT);
+  scheduleSequence(result, ctx.currentTime, onEnd);
 }
 
 // Generate a VAE sequence, interpolating from previous if available
@@ -976,27 +1035,58 @@ async function generateVAESequence(model, chordSym, temperature){
   return samples[0];
 }
 
-// Continuous loop for VAE
+// Continuous loop for VAE — pre-generates next phrase during current playback
+let _nextPhraseReady=null; // pre-generated next phrase
+let _pregenInProgress=false;
+
+async function pregenNextPhrase(){
+  if(_pregenInProgress||!improvPlaying||!improvContinuous||!_continuousChord)return;
+  _pregenInProgress=true;
+  try{
+    const model=await getImprovModel();
+    if(!model||!improvPlaying||!improvContinuous){_pregenInProgress=false;return;}
+    const{rootIdx,quality}=_continuousChord;
+    const chordSym=chordToMagentaSymbol(rootIdx,quality);
+    _nextPhraseReady=await generateVAESequence(model, chordSym, improvTemperature);
+  }catch(e){
+    console.warn('Pre-gen failed:',e);
+    _nextPhraseReady=null;
+  }
+  _pregenInProgress=false;
+}
+
 async function continuousLoop(){
   if(!improvPlaying||!improvContinuous||!_continuousChord)return;
-  const model=await getImprovModel();
-  if(!model||improvModel!=='vae'){improvPlaying=false;return;}
   
-  const{rootIdx,quality}=_continuousChord;
-  const chordSym=chordToMagentaSymbol(rootIdx,quality);
+  let result=_nextPhraseReady;
+  _nextPhraseReady=null;
   
-  try{
-    const result=await generateVAESequence(model, chordSym, improvTemperature);
-    if(!improvPlaying||!improvContinuous)return;
-    playImprovSequence(result,()=>{
-      // When this phrase ends, generate and play the next one
-      if(improvPlaying&&improvContinuous)continuousLoop();
-      else improvPlaying=false;
-    });
-  }catch(e){
-    console.error('Continuous loop failed:',e);
-    improvPlaying=false;
+  if(!result){
+    // No pre-generated phrase ready, generate now
+    const model=await getImprovModel();
+    if(!model||improvModel!=='vae'){improvPlaying=false;return;}
+    const{rootIdx,quality}=_continuousChord;
+    const chordSym=chordToMagentaSymbol(rootIdx,quality);
+    try{
+      result=await generateVAESequence(model, chordSym, improvTemperature);
+    }catch(e){
+      console.error('Continuous loop failed:',e);
+      improvPlaying=false;return;
+    }
   }
+  
+  if(!improvPlaying||!improvContinuous)return;
+  
+  // Schedule this phrase; get its end time for seamless next phrase
+  const ctx=getAudio();
+  if(!ctx)return;
+  const endTime=scheduleSequence(result, _schedEndTime||ctx.currentTime, ()=>{
+    if(improvPlaying&&improvContinuous)continuousLoop();
+    else improvPlaying=false;
+  });
+  
+  // Start pre-generating the next phrase immediately
+  pregenNextPhrase();
 }
 
 // Generate and play an improvisation over a chord
@@ -1030,14 +1120,21 @@ async function improviseOverChord(rootIdx, quality, playChordFn){
     // Play chord and improv at the same instant
     if(playChordFn)playChordFn();
     
-    playImprovSequence(result,()=>{
-      // If continuous mode + VAE, keep going
+    // Clear any pre-generated phrase (chord changed)
+    _nextPhraseReady=null;
+    
+    const ctx=getAudio();
+    const startTime=ctx?ctx.currentTime:0;
+    scheduleSequence(result, startTime, ()=>{
       if(improvContinuous&&improvModel==='vae'&&improvPlaying){
         continuousLoop();
       }else{
         improvPlaying=false;
       }
     });
+    
+    // Pre-generate next phrase while this one plays
+    if(improvContinuous&&improvModel==='vae')pregenNextPhrase();
   }catch(e){
     console.error('Improv generation failed:',e);
     improvPlaying=false;
