@@ -689,16 +689,17 @@ async function initSuperSonic(){
     if(badge){badge.textContent='⚡ SuperSonic';badge.style.background='rgba(61,173,217,0.2)';badge.style.color='#3DADD9';badge.title='ctx:'+ssCtxState;}
   }catch(e){
     const errMsg=(e.message||String(e)).slice(0,60);
-    console.warn('SuperSonic failed:',e);
+    const failedAt=badge?badge.textContent:'?';
+    console.warn('SuperSonic failed at ['+failedAt+']:',e);
     if(sonic){try{sonic.shutdown();}catch(x){}}
     sonic=null;sonicReady=false;sonicLoading=false;
     if(badge){badge.textContent='Web Audio';badge.title='SuperSonic error: '+errMsg;badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
     // Show error visually for debugging on mobile
     const errDiv=document.createElement('div');
     errDiv.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#300;color:#f88;font:10px monospace;padding:4px 8px;z-index:9999;max-height:80px;overflow:auto;';
-    errDiv.textContent='SS err: '+errMsg+' | badge was: '+(badge?badge.textContent:'?');
+    errDiv.textContent='SS err: '+errMsg+' | step: '+failedAt+' | SAB:'+(typeof SharedArrayBuffer!=='undefined');
     document.body.appendChild(errDiv);
-    setTimeout(()=>errDiv.remove(),15000);
+    setTimeout(()=>errDiv.remove(),30000);
   }
 }
 
