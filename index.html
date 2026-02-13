@@ -2335,13 +2335,19 @@ let recSpeed=0; // bipolar: -5 to +5, 0 = stopped
 function setRecSpeed(v){
   recSpeed=+v;
   document.getElementById('recTempoVal').textContent=v>0?'+'+v+'×':v==0?'0':v+'×';
-  // Map speed to playback rate: 0=paused, ±1=1×, ±5=5×
   const absRate=Math.abs(recSpeed);
   recPlaybackRate=absRate===0?0:absRate;
   recReverse=recSpeed<0;
-  // If playing, restart with new speed/direction
-  if(recIsPlaying&&absRate>0){stopPlayback();startPlayback();}
-  else if(recIsPlaying&&absRate===0){stopPlayback();}
+  // If playing, reschedule remaining chords without full stop
+  if(recIsPlaying&&absRate>0){
+    recPlayTimers.forEach(t=>clearTimeout(t));
+    recPlayTimers=[];
+    startPlayback();
+  }else if(recIsPlaying&&absRate===0){
+    // Pause — clear timers but stay in "playing" state so resuming works
+    recPlayTimers.forEach(t=>clearTimeout(t));
+    recPlayTimers=[];
+  }
 }
 let recReverse=false;
 let recPlayTimers=[];
