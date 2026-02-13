@@ -557,13 +557,16 @@ function playChordNotes(rootNote,intervals){
   checkMuteState();
   // Force-recreate AudioContext if suspended (iOS kills it after tab switch/lock)
   let ctx=getAudio();
-  if(ctx.state==='suspended'){
+  if(ctx.state==='suspended'||ctx.state==='closed'){
     ctx.resume().catch(()=>{});
-    // If still suspended after resume attempt, nuke and recreate
-    if(ctx.state==='suspended'){
+    // If still not running, nuke and recreate with silent warmup
+    if(ctx.state!=='running'){
       try{ctx.close();}catch(e){}
       audioCtx=null;masterGain=null;reverbNode=null;
       ctx=getAudio();
+      // Silent buffer warmup (iOS Safari unlock trick)
+      try{const b=ctx.createBuffer(1,1,22050);const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0);}catch(e){}
+      ctx.resume().catch(()=>{});
     }
   }
   const baseFreq=261.63*Math.pow(2,(rootNote+octaveShift*12)/12);
@@ -715,7 +718,29 @@ function redoHistory(){
 
 // Toolbar toggles
 function toggleNames(){showNames=!showNames;document.getElementById('eyeBtn').classList.toggle('active',showNames);render();}
-function toggleSound(){soundOn=!soundOn;document.getElementById('soundBtn').classList.toggle('active',soundOn);document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';}
+function toggleSound(){
+  soundOn=!soundOn;
+  document.getElementById('soundBtn').classList.toggle('active',soundOn);
+  document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
+  if(soundOn){
+    // Nuke and recreate AudioContext to avoid stale/suspended state
+    if(audioCtx){try{audioCtx.close();}catch(e){}}
+    audioCtx=null;masterGain=null;reverbNode=null;activeVoices=[];
+    const ctx=getAudio();
+    // Warm up: play silent buffer to unlock iOS Safari audio
+    try{
+      const buf=ctx.createBuffer(1,1,22050);
+      const src=ctx.createBufferSource();
+      src.buffer=buf;src.connect(ctx.destination);src.start(0);
+    }catch(e){}
+    ctx.resume().catch(()=>{});
+  }else{
+    // Muting: stop all active voices and suspend context
+    activeVoices.forEach(v=>{try{v.stop(0);}catch(e){}});
+    activeVoices=[];
+    if(audioCtx)audioCtx.suspend().catch(()=>{});
+  }
+}
 function toggleLock(){lockRoot=!lockRoot;document.getElementById('lockBtn').classList.toggle('active',lockRoot);document.getElementById('lockBtn').textContent=lockRoot?'🔒':'🔓';}
 function copyChords(){
   const mode=MODES.find(m=>m.id===currentMode);
