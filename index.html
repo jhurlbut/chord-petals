@@ -180,7 +180,9 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
 }
 .midi-panel.open{transform:translate(-50%,0)}
-.midi-panel h3{font-size:13px;font-weight:600;margin-bottom:10px}
+.midi-panel h3{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.midi-panel h3 .panel-close{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+.midi-panel h3 .panel-close:hover{color:var(--text)}
 .midi-panel label{display:block;font-size:11px;color:var(--text-dim);margin:6px 0 3px}
 .midi-panel select{
   width:100%;padding:5px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);
@@ -257,7 +259,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
 <!-- Voicing Panel -->
 <div class="midi-panel" id="voicePanel">
-  <h3>🎛 Voicing & Phrasing</h3>
+  <h3><span>🎛 Voicing & Phrasing</span><button class="panel-close" onclick="document.getElementById('voicePanel').classList.remove('open')">✕</button></h3>
   <label>Synth Sound</label>
   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
     <button class="voice-opt active" data-synth="warm" onclick="setSynth('warm')">Warm</button>
@@ -291,7 +293,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
 <!-- Improv Settings Panel -->
 <div class="midi-panel" id="improvPanel">
-  <h3>🎵 AI Improvisation</h3>
+  <h3><span>🎵 AI Improvisation</span><button class="panel-close" onclick="document.getElementById('improvPanel').classList.remove('open')">✕</button></h3>
   <div class="improv-loading" id="improvLoadingBar"><div class="spinner"></div><span id="improvLoadingText">Loading model…</span></div>
   <label>Improvisation</label>
   <label class="midi-toggle"><input type="checkbox" id="improvToggle" onchange="setImprovEnabled(this.checked)"><span class="sw"></span>Enable</label>
@@ -362,7 +364,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
 <!-- MIDI Panel -->
 <div class="midi-panel" id="midiPanel">
-  <h3>🎹 MIDI Settings</h3>
+  <h3><span>🎹 MIDI Settings</span><button class="panel-close" onclick="document.getElementById('midiPanel').classList.remove('open')">✕</button></h3>
   <label>MIDI Output</label>
   <select id="midiOut"><option value="">None</option></select>
   <label>MIDI Input</label>
