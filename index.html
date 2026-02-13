@@ -2108,6 +2108,7 @@ function render(){
           const cur=petalVoicings[idx]||extLvl;
           petalVoicings[idx]=(cur+1)%4;
           el._wasDragged=true;
+          tapC=0;clearTimeout(tapT); // reset tap counter so release doesn't trigger double-tap
           render();
           const vl2=petalVoicings[idx];
           const ext2=VOICING_EXTENSIONS[c.quality];
