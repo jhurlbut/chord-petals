@@ -1214,8 +1214,10 @@ function playChordNotes(rootNote,intervals){
 
 function playChord(rootNote,quality){
   if(!soundOn)return;
-  const intervals=QUALITY[quality]?.intervals||[0,4,7];
-  recordChordEvent(rootNote,quality,null);
+  // Use global voicing level if set
+  const ext=VOICING_EXTENSIONS[quality];
+  const intervals=ext&&ext[globalVoicingLevel]?ext[globalVoicingLevel]:(QUALITY[quality]?.intervals||[0,4,7]);
+  recordChordEvent(rootNote,quality,intervals);
   playChordNotes(rootNote,intervals);
 }
 
