@@ -46,6 +46,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 .mode-bar{
   display:flex;gap:3px;padding:8px 10px;overflow-x:auto;scrollbar-width:none;
   border-bottom:1px solid rgba(255,255,255,0.04);
+  -webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;
 }
 .mode-bar::-webkit-scrollbar{display:none}
 .mode-btn{
@@ -259,6 +260,74 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     <button class="tool-btn" onclick="toggleMidiPanel()" title="MIDI">🎹</button>
     <button class="tool-btn" id="recBtn" onclick="toggleRecordPanel()" title="Record/Play">⏺</button>
     <button class="tool-btn" onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" title="Debug Layout">🔧</button>
+    <button class="tool-btn" onclick="toggleHelpOverlay()" title="Help">❓</button>
+  </div>
+</div>
+
+<!-- Help Overlay -->
+<div id="helpOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,5,18,0.92);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:480px;margin:0 auto;padding:24px 18px calc(env(safe-area-inset-bottom,20px) + 24px);color:#e8e4f0;font-size:14px;line-height:1.6;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;font-size:22px;">🌸 ChordPetals Help</h2>
+      <button onclick="toggleHelpOverlay()" style="background:none;border:none;color:#8878a0;font-size:24px;cursor:pointer;padding:4px;">✕</button>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">🎯 The Petal Wheel</h3>
+      <p style="margin:0 0 6px;"><b>Tap center chord</b> — play the current root chord</p>
+      <p style="margin:0 0 6px;"><b>Tap a petal</b> — play that chord &amp; make it the new center</p>
+      <p style="margin:0 0 6px;"><b>Long-press a petal</b> — override its voicing level (single→11th)</p>
+      <p style="margin:0 0 6px;"><b>Rotate ring</b> — drag the outer ring to rotate petals</p>
+      <p style="margin:0;"><b>+/−</b> — add or remove petals (3–12)</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">⚙ Top Bar</h3>
+      <p style="margin:0 0 6px;"><b>Key selector</b> — change root key</p>
+      <p style="margin:0 0 6px;"><b>Chord group dropdown</b> — switch between Diatonic, Jazz, Modal, Blues, Chromatic Mediants, Andalusian, Borrowed, Chord Planing, Secondary Dominants</p>
+      <p style="margin:0 0 6px;"><b>↩ / ↪</b> — undo / redo navigation</p>
+      <p style="margin:0;"><b>🔓</b> — lock root so petals don't re-center on tap</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">🎛 Voicing &amp; Phrasing</h3>
+      <p style="margin:0 0 6px;"><b>Synth</b> — choose instrument: Warm, Bright, Pad, Keys, Pluck, Organ + Sonic Pi synths (Prophet, Blade, Dark Amb, Piano, Bell)</p>
+      <p style="margin:0 0 6px;"><b>Voice mode</b> — Close, Open, or Spread voicing</p>
+      <p style="margin:0 0 6px;"><b>Octave ▼▲</b> — shift pitch up/down</p>
+      <p style="margin:0 0 6px;"><b>Polyphony ▼▲</b> — global note count: Single(1) → Dyad(2) → Triad → 7th → 9th → 11th</p>
+      <p style="margin:0 0 6px;"><b>Phrasing</b> — Block, Strum, or Arpeggio</p>
+      <p style="margin:0;"><b>FX</b> — Reverb &amp; Delay with adjustable mix/time/feedback</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">🎵 AI Improvisation</h3>
+      <p style="margin:0 0 6px;">Toggle to generate melodies over your chord changes using ML models</p>
+      <p style="margin:0 0 6px;"><b>MusicRNN</b> — recurrent neural network melody generation</p>
+      <p style="margin:0 0 6px;"><b>MelodyVAE</b> — variational autoencoder melodies</p>
+      <p style="margin:0;"><b>Temperature</b> — controls randomness (low = predictable, high = wild)</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">⏺ Record &amp; Play</h3>
+      <p style="margin:0 0 6px;"><b>Record</b> — captures chord taps with timing</p>
+      <p style="margin:0 0 6px;"><b>Play/Stop</b> — replay your recorded progression</p>
+      <p style="margin:0 0 6px;"><b>Loop</b> — toggle looping playback</p>
+      <p style="margin:0;"><b>Speed</b> — bipolar control from −5× (reverse) to +5×</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#F2506E;">🔧 Bottom Toolbar</h3>
+      <p style="margin:0 0 6px;"><b>👁</b> — show/hide chord names on petals</p>
+      <p style="margin:0 0 6px;"><b>📋</b> — copy current chords to clipboard</p>
+      <p style="margin:0 0 6px;"><b>🔊</b> — toggle sound on/off</p>
+      <p style="margin:0 0 6px;"><b>🎛</b> — voicing &amp; phrasing panel</p>
+      <p style="margin:0 0 6px;"><b>🎵</b> — AI improvisation panel</p>
+      <p style="margin:0 0 6px;"><b>🎹</b> — MIDI settings</p>
+      <p style="margin:0 0 6px;"><b>⏺</b> — record &amp; play panel</p>
+      <p style="margin:0;"><b>❓</b> — this help screen</p>
+    </div>
+
+    <p style="text-align:center;color:#8878a0;font-size:12px;margin-top:20px;">ChordPetals — tap, explore, create 🌸</p>
   </div>
 </div>
 
@@ -269,10 +338,10 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   <!-- Instruments — grouped at top -->
   <label>Web Synths</label>
   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
-    <button class="voice-opt active" data-synth="warm" onclick="setSynth('warm')">Warm</button>
+    <button class="voice-opt" data-synth="warm" onclick="setSynth('warm')">Warm</button>
     <button class="voice-opt" data-synth="bright" onclick="setSynth('bright')">Bright</button>
     <button class="voice-opt" data-synth="pad" onclick="setSynth('pad')">Pad</button>
-    <button class="voice-opt" data-synth="keys" onclick="setSynth('keys')">Keys</button>
+    <button class="voice-opt active" data-synth="keys" onclick="setSynth('keys')">Keys</button>
     <button class="voice-opt" data-synth="pluck" onclick="setSynth('pluck')">Pluck</button>
     <button class="voice-opt" data-synth="organ" onclick="setSynth('organ')">Organ</button>
   </div>
@@ -318,7 +387,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
     </div>
     <div style="flex:0 0 100px">
       <label>Bass Root</label>
-      <label class="midi-toggle"><input type="checkbox" id="bassToggle" onchange="toggleBass(this.checked)"><span class="sw"></span>On</label>
+      <label class="midi-toggle"><input type="checkbox" id="bassToggle" checked onchange="toggleBass(this.checked)"><span class="sw"></span>On</label>
     </div>
   </div>
 
@@ -343,8 +412,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
       <input type="range" min="0" max="100" step="5" value="30" style="width:100%" id="ssReverbSlider" oninput="setSSReverb(this.value)">
     </div>
     <div style="flex:1">
-      <label>Delay: <span id="ssDelayVal" style="color:var(--text)">Off</span></label>
-      <input type="range" min="0" max="100" step="5" value="0" style="width:100%" id="ssDelaySlider" oninput="setSSDelay(this.value)">
+      <label>Delay: <span id="ssDelayVal" style="color:var(--text)">20%</span></label>
+      <input type="range" min="0" max="100" step="5" value="20" style="width:100%" id="ssDelaySlider" oninput="setSSDelay(this.value)">
     </div>
   </div>
   <label>Delay Time: <span id="ssDelayTimeVal" style="color:var(--text)">300ms</span></label>
@@ -622,12 +691,12 @@ function chord(root,quality,numeral=''){
 // HARMONY MODES
 // ═══════════════════════════════════════════
 const MODES = [
+  {id:'diatonic',label:'Diatonic',fn:getDiatonic},
   {id:'chromediant',label:'Chromatic Mediants',fn:getChromaticMediants},
   {id:'andalusian',label:'Andalusian',fn:getAndalusian},
   {id:'borrowed',label:'Borrowed Chords',fn:getBorrowedChords},
   {id:'parallel',label:'Chord Planing',fn:getChordPlaning},
   {id:'secondary',label:'Secondary Doms',fn:getSecondaryDominants},
-  {id:'diatonic',label:'Diatonic',fn:getDiatonic},
   {id:'fifths',label:'Circle of 5ths',fn:getCircleOfFifths},
   {id:'relative',label:'Relative/Parallel',fn:getRelativeParallel},
   {id:'tritone',label:'Tritone Subs',fn:getTritoneSubs},
@@ -878,7 +947,7 @@ function freqToMidi(freq){return Math.round(12*Math.log2(freq/440)+69);}
 // ═══════════════════════════════════════════
 // SuperSonic FX — Web Audio delay + reverb on SS output
 // ═══════════════════════════════════════════
-let ssFxReverb=0.3, ssFxDelay=0, ssFxDelayTime=0.3;
+let ssFxReverb=0.3, ssFxDelay=0.2, ssFxDelayTime=0.3;
 let ssDelayNode=null, ssDelayFeedback=null, ssDelayWet=null, ssReverbGain=null, ssDryGain=null;
 let ssConvolver=null, ssFxSetup=false;
 
@@ -1632,11 +1701,11 @@ let showNames=true;
 let soundOn=true;
 let lockRoot=false;
 // Voicing & phrasing options
-let bassRoot=false;      // play root in bass octave
+let bassRoot=true;       // play root in bass octave
 let voicingMode='close'; // close, open, spread
 let phraseMode='block';  // block, strum, arpeggio
 let octaveShift=0;       // -2 to +2 octaves
-let synthPreset='warm';  // warm, bright, pad, keys, pluck, organ
+let synthPreset='keys';  // warm, bright, pad, keys, pluck, organ
 const SYNTH_PRESETS={
   warm:{osc:'sawtooth',detune:0.005,sub:true,subVol:0.3,filterStart:2200,filterEnd:800,filterQ:1.5,attack:0.005,decay:0.12,sustain:0.6,release:1.0,total:1.8},
   bright:{osc:'sawtooth',detune:0.008,sub:false,subVol:0,filterStart:6000,filterEnd:2000,filterQ:2.0,attack:0.003,decay:0.08,sustain:0.7,release:0.8,total:1.5},
@@ -1682,6 +1751,13 @@ function init(){
     e.preventDefault();
     bar.scrollLeft+=e.deltaY;
   },{passive:false});
+  // Desktop: click-and-drag to scroll mode bar
+  {let dragging=false,moved=false,startX,scrollL;
+  bar.addEventListener('mousedown',(e)=>{dragging=true;moved=false;startX=e.pageX;scrollL=bar.scrollLeft;bar.style.cursor='grabbing';bar.style.userSelect='none';});
+  window.addEventListener('mousemove',(e)=>{if(!dragging)return;const dx=e.pageX-startX;if(Math.abs(dx)>3)moved=true;e.preventDefault();bar.scrollLeft=scrollL-dx;});
+  window.addEventListener('mouseup',()=>{if(!dragging)return;dragging=false;bar.style.cursor='grab';bar.style.removeProperty('user-select');});
+  bar.addEventListener('click',(e)=>{if(moved){e.stopPropagation();e.preventDefault();moved=false;}},true);
+  bar.style.cursor='grab';}
   buildKeyPopup();
   buildMidiChannels();
   render();
@@ -2501,6 +2577,11 @@ function setRecSpeed(v){
 }
 let recReverse=false;
 let recPlayTimers=[];
+
+function toggleHelpOverlay(){
+  const h=document.getElementById('helpOverlay');
+  h.style.display=h.style.display==='none'?'block':'none';
+}
 
 function toggleRecordPanel(){
   const p=document.getElementById('recordPanel');
