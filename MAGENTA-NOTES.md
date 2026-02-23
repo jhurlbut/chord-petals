@@ -1,4 +1,4 @@
-# Magenta.js Integration Notes for ChordPetals
+# Magenta.js Integration Notes for ChordBloom
 
 ## Research Date: 2026-02-13
 

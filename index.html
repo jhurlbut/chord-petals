@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" crossorigin="anonymous">
-<title>ChordPetals</title>
+<title>ChordBloom</title>
 <script crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@magenta/music@1.23.1"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -217,7 +217,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div class="widget">
   <!-- Header -->
   <div class="widget-header">
-    <div><span class="title">ChordPetals</span><span class="palette">Palette 1</span><span id="engineBadge" style="font-size:9px;padding:1px 5px;border-radius:6px;margin-left:6px;background:rgba(255,255,255,0.08);color:var(--text-dim)">Web Audio</span></div>
+    <div><span class="title">ChordBloom</span><span class="palette">Palette 1</span><span id="engineBadge" style="font-size:9px;padding:1px 5px;border-radius:6px;margin-left:6px;background:rgba(255,255,255,0.08);color:var(--text-dim)">Web Audio</span></div>
     <div class="header-actions">
       <button id="undoBtn" onclick="undoHistory()" title="Undo">↩</button>
       <button id="redoBtn" onclick="redoHistory()" title="Redo" disabled>↪</button>
@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 <div id="helpOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,5,18,0.92);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:480px;margin:0 auto;padding:24px 18px calc(env(safe-area-inset-bottom,20px) + 24px);color:#e8e4f0;font-size:14px;line-height:1.6;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <h2 style="margin:0;font-size:22px;">🌸 ChordPetals Help</h2>
+      <h2 style="margin:0;font-size:22px;">🌸 ChordBloom Help</h2>
       <button onclick="toggleHelpOverlay()" style="background:none;border:none;color:#8878a0;font-size:24px;cursor:pointer;padding:4px;">✕</button>
     </div>
 
@@ -327,7 +327,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
       <p style="margin:0;"><b>❓</b> — this help screen</p>
     </div>
 
-    <p style="text-align:center;color:#8878a0;font-size:12px;margin-top:20px;">ChordPetals — tap, explore, create 🌸</p>
+    <p style="text-align:center;color:#8878a0;font-size:12px;margin-top:20px;">ChordBloom — tap, explore, create 🌸</p>
   </div>
 </div>
 
@@ -538,12 +538,23 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
 <!-- Pre-load SuperSonic as ES module (iOS WebKit needs same-origin for AudioWorklet) -->
 <script type="module">
+const _ssdbg = /iPhone|iPad|iPod/.test(navigator.userAgent);
+if(_ssdbg) console.log('[SS-debug] ES module loading supersonic.js…');
 import { SuperSonic } from './dist/supersonic.js';
+if(_ssdbg) console.log('[SS-debug] ES module imported OK, SuperSonic class:', typeof SuperSonic);
 window._SuperSonicClass = SuperSonic;
 window.dispatchEvent(new Event('supersonic-ready'));
+if(_ssdbg) console.log('[SS-debug] supersonic-ready event dispatched');
 </script>
 
 <script>
+// ═══════════════════════════════════════════
+// PLATFORM DETECTION
+// ═══════════════════════════════════════════
+const IS_IOS_WEBVIEW = /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+                       !!(window.webkit && window.webkit.messageHandlers);
+const IS_TOUCH_PRIMARY = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
 // ═══════════════════════════════════════════
 // MUSIC THEORY ENGINE
 // ═══════════════════════════════════════════
@@ -848,32 +859,54 @@ const SONIC_PI_PRESETS=new Set(['sp-prophet','sp-blade','sp-dark_ambience','sp-p
 const SONIC_SYNTHDEFS_TO_LOAD=Object.values(SONIC_SYNTH_MAP).filter((v,i,a)=>a.indexOf(v)===i);
 
 async function initSuperSonic(){
+  if(IS_IOS_WEBVIEW) console.log('[SS-debug] initSuperSonic() called, sonic:', !!sonic, 'sonicLoading:', sonicLoading);
   if(sonic||sonicLoading)return;
   sonicLoading=true;
   const badge=document.getElementById('engineBadge');
   if(badge){badge.textContent='⏳ Loading…';badge.style.color='var(--text-dim)';}
-  
+
+  if(IS_IOS_WEBVIEW){
+    console.log('[SS-debug] Environment check:');
+    console.log('[SS-debug]   location.protocol:', location.protocol);
+    console.log('[SS-debug]   crossOriginIsolated:', window.crossOriginIsolated);
+    console.log('[SS-debug]   SharedArrayBuffer:', typeof SharedArrayBuffer);
+    console.log('[SS-debug]   AudioWorklet:', !!window.AudioWorklet);
+    try { console.log('[SS-debug]   AudioContext.audioWorklet:', !!(window.AudioContext && AudioContext.prototype.audioWorklet)); } catch(e) { console.error('[SS-debug]   AudioContext.audioWorklet ERROR:', e.message); }
+    try { console.log('[SS-debug]   _SuperSonicClass:', typeof window._SuperSonicClass); } catch(e) { console.error('[SS-debug]   _SuperSonicClass ERROR:', e.message); }
+    console.log('[SS-debug]   isSecureContext:', window.isSecureContext);
+    console.log('[SS-debug] env check complete');
+  }
+
   // Check for required browser features first
   if(!window.AudioWorklet && !(window.AudioContext && AudioContext.prototype.audioWorklet)){
-    console.warn('SuperSonic: AudioWorklet not supported');
+    if(IS_IOS_WEBVIEW) console.warn('[SS-debug] BLOCKED: AudioWorklet not supported');
     sonicLoading=false;
     if(badge){badge.textContent='Web Audio';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
     return;
   }
-  // SuperSonic WASM requires SharedArrayBuffer (even in postMessage mode)
+  // SharedArrayBuffer may not be available without COOP/COEP headers
+  // (e.g. in WKWebView file:// or custom schemes). On iOS, let SuperSonic
+  // try anyway in postMessage mode — the try/catch below will handle failures.
+  // On desktop, hard-block since SAB is required.
   if(typeof SharedArrayBuffer==='undefined'){
-    console.warn('SuperSonic: SharedArrayBuffer not available (needs COOP/COEP headers)');
-    sonicLoading=false;
-    if(badge){badge.textContent='Web Audio';badge.title='SuperSonic needs SharedArrayBuffer (requires server COOP/COEP headers)';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
-    return;
+    if(IS_IOS_WEBVIEW){
+      console.warn('[SS-debug] SharedArrayBuffer not available — attempting postMessage mode');
+    } else {
+      console.warn('SuperSonic: SharedArrayBuffer not available (needs COOP/COEP headers)');
+      sonicLoading=false;
+      if(badge){badge.textContent='Web Audio';badge.title='SuperSonic needs SharedArrayBuffer (requires server COOP/COEP headers)';badge.style.background='rgba(255,255,255,0.08)';badge.style.color='var(--text-dim)';}
+      return;
+    }
   }
-  
+
   const mkTimeout=(ms)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms));
-  
+
+  if(IS_IOS_WEBVIEW) console.log('[SS-debug] Passed all checks, entering try block…');
   try{
-    console.log('SuperSonic: waiting for module…');
+    if(IS_IOS_WEBVIEW) console.log('[SS-debug] waiting for module… _SuperSonicClass:', typeof window._SuperSonicClass);
     // Wait for the pre-loaded ES module (or timeout after 10s)
     if(!window._SuperSonicClass){
+      if(IS_IOS_WEBVIEW) console.log('[SS-debug] _SuperSonicClass not yet available, waiting for supersonic-ready event…');
       await Promise.race([
         new Promise(r=>{window.addEventListener('supersonic-ready',r,{once:true});}),
         mkTimeout(10000)
@@ -2152,60 +2185,177 @@ function render(){
     // Attach event handlers only once
     if(!el._eventsAttached){
       el._eventsAttached=true;
-      // Use pointerup instead of click — iOS Safari suppresses click
-      // on elements with pointerdown handlers
-      el.addEventListener('pointerup',(e)=>{
-        if(el._wasDragged)return;
-        e.stopPropagation();
-        const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
-        selectedPetal=idx===selectedPetal?-1:idx;
-        // Send MIDI immediately (don't wait for audio)
-        sendMIDIChord(c.root,c.quality);
-        const ext=VOICING_EXTENSIONS[c.quality];
-        if(improvEnabled){
-          // Generate improv first, then play chord + improv simultaneously
-          const intervals=ext&&ext[vl]?ext[vl]:(QUALITY[c.quality]?.intervals||[0,4,7]);
-          improviseOverChord(c.root,c.quality,()=>playChordNotes(c.root,intervals));
-        } else {
-          if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
-          else playChord(c.root,c.quality);
-        }
-        // Spring animation
-        const bp=el._basePos||{x:0,y:0};
-        const baseT=`translate(${bp.x}px,${bp.y}px)`;
-        el.style.transition='transform 0.1s ease-out';
-        el.style.transform=baseT+' scale(0.88)';
-        setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT+' scale(1.06)';},100);
-        setTimeout(()=>{el.style.transition='transform 0.25s cubic-bezier(0.34,1.2,0.64,1)';el.style.transform=baseT+' scale(0.97)';},350);
-        setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform=baseT;render();},550);
-      });
-
-      let tapC=0,tapT,longPressT;
-      el.addEventListener('pointerdown',(ev)=>{
-        el._wasDragged=false;
-        const{ch:c,i:idx}=el._chordData;
-        tapC++;
-        if(tapC===2){
-          clearTimeout(tapT);tapC=0;
-          if(!lockRoot)setRoot(c.root,c.name);
-          else{delete petalCustomOffsets[idx];render();}
-          return;
-        }
-        tapT=setTimeout(()=>tapC=0,250); // 250ms window for double-tap
-        longPressT=setTimeout(()=>{
-          const extLvl=getExtLevel();
-          const cur=petalVoicings[idx]||extLvl;
-          petalVoicings[idx]=(cur+1)%4;
-          el._wasDragged=true;
-          tapC=0;clearTimeout(tapT); // reset tap counter so release doesn't trigger double-tap
-          render();
-          const vl2=petalVoicings[idx];
-          const ext2=VOICING_EXTENSIONS[c.quality];
-          if(ext2&&ext2[vl2])playChordIntervals(c.root,ext2[vl2]);
-        },500);
-      });
-      el.addEventListener('pointerup',()=>clearTimeout(longPressT));
-      el.addEventListener('pointermove',()=>clearTimeout(longPressT));
+      if(IS_TOUCH_PRIMARY){
+        // ── Touch path: play audio immediately on touchstart for low latency ──
+        let _startX=null,_startY=null,_lastTapTime=0,_longPressT=null,_dragging=false,_longFired=false;
+        el.addEventListener('touchstart',(e)=>{
+          const t=e.touches[0];
+          _startX=t.clientX;_startY=t.clientY;
+          _dragging=false;_longFired=false;
+          const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
+          selectedPetal=idx;
+          document.querySelectorAll('.petal[data-index]').forEach(p=>{
+            p.classList.toggle('selected',parseInt(p.dataset.index)===selectedPetal);
+          });
+          // Bounce animation (2-stage: compress → spring back)
+          const bp=el._basePos||{x:0,y:0};
+          const baseT=`translate(${bp.x}px,${bp.y}px)`;
+          el.style.transition='transform 0.08s ease-out';
+          el.style.transform=baseT+' scale(0.9)';
+          setTimeout(()=>{el.style.transition='transform 0.15s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT;},80);
+          sendMIDIChord(c.root,c.quality);
+          const ext=VOICING_EXTENSIONS[c.quality];
+          if(improvEnabled){
+            const intervals=ext&&ext[vl]?ext[vl]:(QUALITY[c.quality]?.intervals||[0,4,7]);
+            improviseOverChord(c.root,c.quality,()=>playChordNotes(c.root,intervals));
+          } else {
+            if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
+            else playChord(c.root,c.quality);
+          }
+          _longPressT=setTimeout(()=>{
+            _longFired=true;
+            const extLvl=getExtLevel();
+            const cur=petalVoicings[idx]||extLvl;
+            petalVoicings[idx]=(cur+1)%4;
+            render();
+            const vl2=petalVoicings[idx];
+            const ext2=VOICING_EXTENSIONS[c.quality];
+            if(ext2&&ext2[vl2])playChordIntervals(c.root,ext2[vl2]);
+          },500);
+        },{passive:true});
+        el.addEventListener('touchmove',(e)=>{
+          if(_startX===null)return;
+          const t=e.touches[0];
+          const dx=t.clientX-_startX,dy=t.clientY-_startY;
+          if(!_dragging&&Math.abs(dx)+Math.abs(dy)>8){
+            _dragging=true;
+            if(_longPressT){clearTimeout(_longPressT);_longPressT=null;}
+            el.classList.add('dragging');
+          }
+          if(_dragging){
+            e.preventDefault();
+            const garden=document.getElementById('garden');
+            const r=garden.getBoundingClientRect();
+            const lx=t.clientX-r.left,ly=t.clientY-r.top;
+            const halfW=parseFloat(el.style.width)/2;
+            el.style.transform=`translate(${lx-halfW}px,${ly-halfW}px)`;
+            el.style.transition='width .1s,height .1s,box-shadow .1s';
+            const cx=r.width/2,cy=r.height/2;
+            const idx=parseInt(el.dataset.index);
+            petalCustomOffsets[idx]={dx:lx-cx,dy:ly-cy};
+            const delRing=document.getElementById('deleteRing');
+            const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
+            const ringR=parseFloat(delRing.style.width)/2;
+            delRing.classList.add('active');
+            if(dist>ringR){delRing.classList.add('danger');el.style.opacity='0.5';}
+            else{delRing.classList.remove('danger');el.style.opacity='1';}
+          }
+        },{passive:false});
+        el.addEventListener('touchend',(e)=>{
+          if(_longPressT){clearTimeout(_longPressT);_longPressT=null;}
+          if(_longFired||_dragging){
+            if(_dragging){
+              _dragging=false;
+              el.classList.remove('dragging');
+              el.style.transition='';el.style.opacity='1';
+              const delRing=document.getElementById('deleteRing');
+              delRing.classList.remove('active','danger');
+              const t=e.changedTouches[0];
+              const garden=document.getElementById('garden');
+              const r=garden.getBoundingClientRect();
+              const cx=r.width/2,cy=r.height/2;
+              const lx=t.clientX-r.left,ly=t.clientY-r.top;
+              const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
+              const ringR=parseFloat(delRing.style.width)/2;
+              const idx=parseInt(el.dataset.index);
+              if(dist>ringR&&petalCount>3){
+                delete petalCustomOffsets[idx];
+                subPetals=subPetals.filter(sp=>sp.parentIdx!==idx).map(sp=>({...sp,parentIdx:sp.parentIdx>idx?sp.parentIdx-1:sp.parentIdx}));
+                petalCount=Math.max(3,petalCount-1);
+                document.getElementById('petalCountLabel').textContent=petalCount;
+              }else{
+                delete petalCustomOffsets[idx];
+              }
+              render();
+            }
+            _startX=null;return;
+          }
+          if(_startX===null)return;
+          const dy=e.changedTouches[0].clientY-_startY;
+          _startX=null;
+          if(Math.abs(dy)<30){
+            e.preventDefault();e.stopPropagation();
+            const now=Date.now();
+            if(now-_lastTapTime<250){
+              _lastTapTime=0;
+              const{ch:c,i:idx}=el._chordData;
+              if(!lockRoot)setRoot(c.root,c.name);
+              else{delete petalCustomOffsets[idx];render();}
+              return;
+            }
+            _lastTapTime=now;
+          }
+        });
+        el.addEventListener('touchcancel',()=>{
+          if(_longPressT){clearTimeout(_longPressT);_longPressT=null;}
+          if(_dragging){
+            _dragging=false;el.classList.remove('dragging');
+            el.style.transition='';el.style.opacity='1';
+            document.getElementById('deleteRing').classList.remove('active','danger');
+            render();
+          }
+          _startX=null;
+        });
+      } else {
+        // ── Pointer path: desktop mouse ──
+        el.addEventListener('pointerup',(e)=>{
+          if(el._wasDragged)return;
+          e.stopPropagation();
+          const{ch:c,i:idx,voiceLevel:vl}=el._chordData;
+          selectedPetal=idx===selectedPetal?-1:idx;
+          sendMIDIChord(c.root,c.quality);
+          const ext=VOICING_EXTENSIONS[c.quality];
+          if(improvEnabled){
+            const intervals=ext&&ext[vl]?ext[vl]:(QUALITY[c.quality]?.intervals||[0,4,7]);
+            improviseOverChord(c.root,c.quality,()=>playChordNotes(c.root,intervals));
+          } else {
+            if(ext&&ext[vl])playChordIntervals(c.root,ext[vl]);
+            else playChord(c.root,c.quality);
+          }
+          // Bounce animation (2-stage: compress → spring back)
+          const bp=el._basePos||{x:0,y:0};
+          const baseT=`translate(${bp.x}px,${bp.y}px)`;
+          el.style.transition='transform 0.08s ease-out';
+          el.style.transform=baseT+' scale(0.9)';
+          setTimeout(()=>{el.style.transition='transform 0.15s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT;render();},80);
+        });
+        let tapC=0,tapT,longPressT;
+        el.addEventListener('pointerdown',(ev)=>{
+          el._wasDragged=false;
+          const{ch:c,i:idx}=el._chordData;
+          tapC++;
+          if(tapC===2){
+            clearTimeout(tapT);tapC=0;
+            if(!lockRoot)setRoot(c.root,c.name);
+            else{delete petalCustomOffsets[idx];render();}
+            return;
+          }
+          tapT=setTimeout(()=>tapC=0,250);
+          longPressT=setTimeout(()=>{
+            const extLvl=getExtLevel();
+            const cur=petalVoicings[idx]||extLvl;
+            petalVoicings[idx]=(cur+1)%4;
+            el._wasDragged=true;
+            tapC=0;clearTimeout(tapT);
+            render();
+            const vl2=petalVoicings[idx];
+            const ext2=VOICING_EXTENSIONS[c.quality];
+            if(ext2&&ext2[vl2])playChordIntervals(c.root,ext2[vl2]);
+          },500);
+        });
+        el.addEventListener('pointerup',()=>clearTimeout(longPressT));
+        el.addEventListener('pointermove',()=>clearTimeout(longPressT));
+      }
     }
   });
 
@@ -2307,26 +2457,106 @@ function render(){
 
     if(!el._eventsAttached){
       el._eventsAttached=true;
-      el.addEventListener('pointerup',(e)=>{
-        if(el._wasDragged)return;
-        e.stopPropagation();
-        const{sp:s,parentChord:pc}=el._subData;
-        // Play alternate voicing intervals if available, otherwise fall back
-        if(s.altIntervals){
-          playChordIntervals(pc.root,s.altIntervals);
-        }else{
-          const ext=VOICING_EXTENSIONS[pc.quality];
-          if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
-          else playChord(pc.root,pc.quality);
-        }
-        sendMIDIChord(pc.root,pc.quality);
-        // Spring animation
-        const baseT=el.style.transform.replace(/ scale\([^)]*\)/g,'');
-        el.style.transition='transform 0.1s ease-out';
-        el.style.transform=baseT+' scale(0.85)';
-        setTimeout(()=>{el.style.transition='transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT+' scale(1.06)';},100);
-        setTimeout(()=>{el.style.transition='transform 0.2s ease-out';el.style.transform=baseT;},350);
-      });
+      if(IS_TOUCH_PRIMARY){
+        // ── Touch path: play audio immediately on touchstart ──
+        let _startX=null,_startY=null,_dragging=false;
+        el.addEventListener('touchstart',(e)=>{
+          const t=e.touches[0];
+          _startX=t.clientX;_startY=t.clientY;
+          _dragging=false;
+          const{sp:s,parentChord:pc}=el._subData;
+          if(s.altIntervals){
+            playChordIntervals(pc.root,s.altIntervals);
+          }else{
+            const ext=VOICING_EXTENSIONS[pc.quality];
+            if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
+            else playChord(pc.root,pc.quality);
+          }
+          sendMIDIChord(pc.root,pc.quality);
+          // Bounce animation (2-stage: compress → spring back)
+          const baseT=el.style.transform.replace(/ scale\([^)]*\)/g,'');
+          el.style.transition='transform 0.08s ease-out';
+          el.style.transform=baseT+' scale(0.88)';
+          setTimeout(()=>{el.style.transition='transform 0.15s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT;},80);
+        },{passive:true});
+        el.addEventListener('touchmove',(e)=>{
+          if(_startX===null)return;
+          const t=e.touches[0];
+          const dx=t.clientX-_startX,dy=t.clientY-_startY;
+          if(!_dragging&&Math.abs(dx)+Math.abs(dy)>8){
+            _dragging=true;
+            el.classList.add('dragging');
+          }
+          if(_dragging){
+            e.preventDefault();
+            const garden=document.getElementById('garden');
+            const r=garden.getBoundingClientRect();
+            const lx=t.clientX-r.left,ly=t.clientY-r.top;
+            const halfW=parseFloat(el.style.width)/2;
+            el.style.transform=`translate(${lx-halfW}px,${ly-halfW}px)`;
+            el.style.transition='width .1s,height .1s,box-shadow .1s';
+            const cx=r.width/2,cy=r.height/2;
+            const delRing=document.getElementById('deleteRing');
+            const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
+            const ringR=parseFloat(delRing.style.width)/2;
+            delRing.classList.add('active');
+            if(dist>ringR){delRing.classList.add('danger');el.style.opacity='0.5';}
+            else{delRing.classList.remove('danger');el.style.opacity='1';}
+          }
+        },{passive:false});
+        el.addEventListener('touchend',(e)=>{
+          if(_dragging){
+            _dragging=false;
+            el.classList.remove('dragging');
+            el.style.transition='';el.style.opacity='1';
+            const delRing=document.getElementById('deleteRing');
+            delRing.classList.remove('active','danger');
+            const t=e.changedTouches[0];
+            const garden=document.getElementById('garden');
+            const r=garden.getBoundingClientRect();
+            const cx=r.width/2,cy=r.height/2;
+            const lx=t.clientX-r.left,ly=t.clientY-r.top;
+            const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
+            const ringR=parseFloat(delRing.style.width)/2;
+            if(dist>ringR){
+              const si=parseInt(el.dataset.subIndex);
+              subPetals.splice(si,1);
+            }
+            render();
+            _startX=null;return;
+          }
+          _startX=null;
+        });
+        el.addEventListener('touchcancel',()=>{
+          if(_dragging){
+            _dragging=false;el.classList.remove('dragging');
+            el.style.transition='';el.style.opacity='1';
+            document.getElementById('deleteRing').classList.remove('active','danger');
+            render();
+          }
+          _startX=null;
+        });
+      } else {
+        // ── Pointer path: desktop mouse ──
+        el.addEventListener('pointerup',(e)=>{
+          if(el._wasDragged)return;
+          e.stopPropagation();
+          const{sp:s,parentChord:pc}=el._subData;
+          if(s.altIntervals){
+            playChordIntervals(pc.root,s.altIntervals);
+          }else{
+            const ext=VOICING_EXTENSIONS[pc.quality];
+            if(ext&&ext[s.voiceLevel])playChordIntervals(pc.root,ext[s.voiceLevel]);
+            else playChord(pc.root,pc.quality);
+          }
+          sendMIDIChord(pc.root,pc.quality);
+          // Bounce animation (2-stage: compress → spring back)
+          const baseT=el.style.transform.replace(/ scale\([^)]*\)/g,'');
+          el.style.transition='transform 0.08s ease-out';
+          el.style.transform=baseT+' scale(0.88)';
+          setTimeout(()=>{el.style.transition='transform 0.15s cubic-bezier(0.34,1.56,0.64,1)';el.style.transform=baseT;},80);
+        });
+      }
     }
   });
 
@@ -2346,21 +2576,23 @@ function render(){
 // DRAG SYSTEM (petals + rotation ring)
 // ═══════════════════════════════════════════
 function initDragSystem(){
+  // On touch devices, petal/sub-petal drag is handled per-element via touch events
+  // (attached in render()). This function handles:
+  //   - Rotation ring drag (pointer events, works on all platforms)
+  //   - Petal drag via pointer events (desktop only, skipped on touch devices)
   const garden=document.getElementById('garden');
   let dragTarget=null,dragType=null,startX,startY,startAngle;
 
   function getPos(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
   function gardenRect(){return garden.getBoundingClientRect();}
 
-  // Petal drag (main + sub-petals)
+  let _pendingDrag=null;
   garden.addEventListener('pointerdown',(e)=>{
-    // Don't intercept +/- buttons
     if(e.target.closest('.petal-count'))return;
     const petal=e.target.closest('.petal');
     const ring=e.target.closest('.rotation-ring');
-    if(petal){
-      // Don't set dragTarget yet — wait for movement threshold in pointermove.
-      // This prevents taps from entering drag state on desktop.
+    if(petal&&!IS_TOUCH_PRIMARY){
+      // Desktop petal drag — wait for movement threshold in pointermove
       _pendingDrag={el:petal,type:petal.dataset.subIndex!==undefined?'subpetal':'petal',pointerId:e.pointerId};
       petal._wasDragged=false;
       petal._dragCaptured=false;
@@ -2376,9 +2608,8 @@ function initDragSystem(){
     }
   });
 
-  let _pendingDrag=null;
   garden.addEventListener('pointermove',(e)=>{
-    // Promote pending drag to active once threshold met
+    // Promote pending petal drag to active once threshold met (desktop only)
     if(_pendingDrag&&!dragTarget){
       const p=getPos(e);
       const dx=p.x-startX,dy=p.y-startY;
@@ -2391,7 +2622,7 @@ function initDragSystem(){
         try{dragTarget.setPointerCapture(_pendingDrag.pointerId);}catch(x){}
         _pendingDrag=null;
       }else{
-        return; // below threshold, don't start drag
+        return;
       }
     }
     if(!dragTarget)return;
@@ -2409,7 +2640,6 @@ function initDragSystem(){
         const idx=parseInt(dragTarget.dataset.index);
         petalCustomOffsets[idx]={dx:lx-cx,dy:ly-cy};
       }
-      // Show delete ring and check if outside
       const delRing=document.getElementById('deleteRing');
       const dist=Math.sqrt((lx-cx)**2+(ly-cy)**2);
       const ringR=parseFloat(delRing.style.width)/2;
@@ -2425,7 +2655,6 @@ function initDragSystem(){
     }
   });
 
-  // Also handle pointercancel (e.g. browser takes over gesture)
   garden.addEventListener('pointercancel',(e)=>{
     _pendingDrag=null;
     if(dragTarget){
@@ -2446,7 +2675,6 @@ function initDragSystem(){
       dragTarget.style.transition='';
       dragTarget.style.opacity='1';
       try{dragTarget.releasePointerCapture(e.pointerId);}catch(x){}
-      // Check if outside delete ring → remove petal
       const r=gardenRect();
       const cx=r.width/2,cy=r.height/2;
       const p=getPos(e);
@@ -2461,7 +2689,6 @@ function initDragSystem(){
         }else if(petalCount>3){
           const idx=parseInt(dragTarget.dataset.index);
           delete petalCustomOffsets[idx];
-          // Also remove sub-petals for this parent and shift indices
           subPetals=subPetals.filter(sp=>sp.parentIdx!==idx).map(sp=>({...sp,parentIdx:sp.parentIdx>idx?sp.parentIdx-1:sp.parentIdx}));
           petalCount=Math.max(3,petalCount-1);
           document.getElementById('petalCountLabel').textContent=petalCount;
@@ -2478,7 +2705,6 @@ function initDragSystem(){
     dragTarget=null;dragType=null;
   });
 
-  // Clear pending drag on any pointerup (tap without drag)
   document.addEventListener('pointerup',()=>{
     _pendingDrag=null;
   },true);

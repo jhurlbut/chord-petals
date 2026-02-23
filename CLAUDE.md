@@ -1,7 +1,7 @@
-# CLAUDE.md — ChordPetals
+# CLAUDE.md — ChordBloom
 
 ## What is this?
-ChordPetals is an interactive chord progression visualizer and explorer. Tap petals to hear chords, navigate between keys, and explore music theory relationships — all in the browser.
+ChordBloom is an interactive chord progression visualizer and explorer. Tap petals to hear chords, navigate between keys, and explore music theory relationships — all in the browser.
 
 ## Architecture
 - **Single file:** `index.html` — all HTML, CSS, and JS inline (~85KB)
@@ -64,8 +64,21 @@ The repo also deploys to https://jhurlbut.github.io/chord-petals/ via GitHub Pag
 - Japandi-influenced minimal UI
 - Full-screen settings panels (voicing, AI improv, MIDI)
 
-## iOS Notes
+## iOS App (chord-petals-ios)
+
+This web app is embedded in a native iOS wrapper at [`../chord-petals-ios`](../chord-petals-ios). The iOS project bundles the built web app in a WKWebView served via a local HTTP server (for SharedArrayBuffer support). It adds native CoreMIDI virtual endpoints, BLE MIDI peripheral advertising, and AVAudioSession mute-switch bypass.
+
+To sync changes into the iOS project after building:
+```bash
+cd ../chord-petals-ios
+./sync-web.sh    # copies index.html, coi-serviceworker.js, dist/ into the iOS bundle
+```
+
+The iOS app injects `NativeMIDIBridge.js` into the WebView at document start, which patches the web app's BLE MIDI connection to route through native CoreMIDI and CoreBluetooth instead.
+
+### iOS-specific notes
 - SuperSonic takes ~20 seconds to fully warm up after init
 - AudioContext gets killed when backgrounding the tab — app auto-reinitializes on return
-- The mute switch on iPhone silences Web Audio output
+- The mute switch on iPhone is bypassed by the native wrapper's AVAudioSession `.playback` category
 - Center chord tap uses touchend (not click) for reliability
+- Use `touchstart` (passive) instead of `pointerdown` for latency-sensitive interactions — see `chord-petals-ios/CLAUDE.md` for details
