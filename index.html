@@ -220,6 +220,7 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 
   <!-- Mode bar -->
   <div class="mode-bar" id="modeBar"></div>
+  <div id="modeToast" style="position:absolute;left:50%;transform:translateX(-50%);top:44px;background:rgba(0,0,0,0.75);color:#b8a8d0;font-size:11px;padding:4px 12px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity 0.3s;white-space:nowrap;z-index:50;backdrop-filter:blur(6px);"></div>
 
   <!-- History -->
   <div class="history" id="history"></div>
@@ -719,16 +720,16 @@ function chord(root,quality,numeral=''){
 // HARMONY MODES
 // ═══════════════════════════════════════════
 const MODES = [
-  {id:'diatonic',label:'Diatonic',fn:getDiatonic},
-  {id:'chromediant',label:'Chromatic Mediants',fn:getChromaticMediants},
-  {id:'andalusian',label:'Andalusian',fn:getAndalusian},
-  {id:'borrowed',label:'Borrowed Chords',fn:getBorrowedChords},
-  {id:'parallel',label:'Chord Planing',fn:getChordPlaning},
-  {id:'secondary',label:'Secondary Doms',fn:getSecondaryDominants},
-  {id:'fifths',label:'Circle of 5ths',fn:getCircleOfFifths},
-  {id:'relative',label:'Relative/Parallel',fn:getRelativeParallel},
-  {id:'tritone',label:'Tritone Subs',fn:getTritoneSubs},
-  {id:'modal',label:'Modal Interchange',fn:getModalInterchange},
+  {id:'diatonic',label:'Diatonic',desc:'All natural chords in the key',fn:getDiatonic},
+  {id:'chromediant',label:'Chromatic Mediants',desc:'Move by major & minor thirds',fn:getChromaticMediants},
+  {id:'andalusian',label:'Andalusian',desc:'Flamenco-style descending cadence',fn:getAndalusian},
+  {id:'borrowed',label:'Borrowed Chords',desc:'Chords borrowed from parallel modes',fn:getBorrowedChords},
+  {id:'parallel',label:'Chord Planing',desc:'Same chord shape shifted in parallel',fn:getChordPlaning},
+  {id:'secondary',label:'Secondary Doms',desc:'Dominant chords targeting each degree',fn:getSecondaryDominants},
+  {id:'fifths',label:'Circle of 5ths',desc:'Jump by perfect fifths',fn:getCircleOfFifths},
+  {id:'relative',label:'Relative/Parallel',desc:'Relative & parallel major/minor pairs',fn:getRelativeParallel},
+  {id:'tritone',label:'Tritone Subs',desc:'Replace dominants with tritone swaps',fn:getTritoneSubs},
+  {id:'modal',label:'Modal Interchange',desc:'Chords from all seven modes of the root',fn:getModalInterchange},
 ];
 
 const SCALE_INTERVALS={
@@ -1870,10 +1871,20 @@ function init(){
   initDragSystem();
 }
 
+let _modeToastTimer=null;
 function setMode(id){
   currentMode=id;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===id));
   petalCustomOffsets={};subPetals=[];nextSubParent=0;
+  // Show mode description toast
+  const mode=MODES.find(m=>m.id===id);
+  if(mode&&mode.desc){
+    const toast=document.getElementById('modeToast');
+    toast.textContent=mode.desc;
+    toast.style.opacity='1';
+    clearTimeout(_modeToastTimer);
+    _modeToastTimer=setTimeout(()=>{toast.style.opacity='0';},2500);
+  }
   render();
 }
 
