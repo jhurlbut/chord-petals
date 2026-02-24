@@ -257,6 +257,30 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   </div>
 </div>
 
+<!-- Welcome / Onboarding Overlay (first visit only) -->
+<div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(10,5,18,0.95);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:400px;margin:0 auto;padding:60px 24px calc(env(safe-area-inset-bottom,20px) + 40px);color:#e8e4f0;font-size:15px;line-height:1.7;text-align:center;">
+    <div style="font-size:64px;margin-bottom:16px;">🌸</div>
+    <h1 style="margin:0 0 8px;font-size:28px;background:linear-gradient(135deg,#F2506E,#f0c928);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">ChordBloom</h1>
+    <p style="color:#8878a0;margin:0 0 32px;font-size:13px;">Explore harmony through petals</p>
+
+    <div style="text-align:left;background:rgba(255,255,255,0.05);border-radius:14px;padding:20px;margin-bottom:24px;">
+      <p style="margin:0 0 14px;"><span style="font-size:18px;">🔊</span> <b>Unmute your phone</b> — flip off silent mode or connect headphones to hear chords</p>
+      <p style="margin:0 0 14px;"><span style="font-size:18px;">👆</span> <b>Tap a petal</b> — play that chord and make it the new center</p>
+      <p style="margin:0 0 14px;"><span style="font-size:18px;">🎵</span> <b>Try Diatonic mode</b> — swipe the mode bar to explore different chord relationships</p>
+      <p style="margin:0;"><span style="font-size:18px;">❓</span> <b>Need help?</b> — tap the ❓ button anytime</p>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px;color:#8878a0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <input type="checkbox" id="welcomeDontShow" style="accent-color:#F2506E;"> Don't show this again
+      </label>
+    </div>
+
+    <button onclick="dismissWelcome()" style="background:linear-gradient(135deg,#F2506E,#d63384);color:white;border:none;padding:14px 48px;border-radius:28px;font-size:17px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(242,80,110,0.4);transition:transform 0.15s;">Let's Go!</button>
+  </div>
+</div>
+
 <!-- Help Overlay -->
 <div id="helpOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,5,18,0.92);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:480px;margin:0 auto;padding:24px 18px calc(env(safe-area-inset-bottom,20px) + 24px);color:#e8e4f0;font-size:14px;line-height:1.6;">
@@ -2870,6 +2894,20 @@ function setRecSpeed(v){
 }
 let recReverse=false;
 let recPlayTimers=[];
+
+// Welcome / Onboarding
+function showWelcomeIfNeeded(){
+  if(!localStorage.getItem('chordbloom-welcomed')){
+    document.getElementById('welcomeOverlay').style.display='block';
+  }
+}
+function dismissWelcome(){
+  if(document.getElementById('welcomeDontShow').checked){
+    localStorage.setItem('chordbloom-welcomed','1');
+  }
+  document.getElementById('welcomeOverlay').style.display='none';
+}
+showWelcomeIfNeeded();
 
 function toggleHelpOverlay(){
   const h=document.getElementById('helpOverlay');
