@@ -258,26 +258,26 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
 </div>
 
 <!-- Welcome / Onboarding Overlay (first visit only) -->
-<div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(10,5,18,0.95);overflow-y:auto;-webkit-overflow-scrolling:touch;">
-  <div style="max-width:400px;margin:0 auto;padding:60px 24px calc(env(safe-area-inset-bottom,20px) + 40px);color:#e8e4f0;font-size:15px;line-height:1.7;text-align:center;">
-    <div style="font-size:64px;margin-bottom:16px;">🌸</div>
-    <h1 style="margin:0 0 8px;font-size:28px;background:linear-gradient(135deg,#F2506E,#f0c928);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">ChordBloom</h1>
-    <p style="color:#8878a0;margin:0 0 32px;font-size:13px;">Explore harmony visually</p>
+<div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(10,5,18,0.97);overflow:hidden;">
+  <div style="max-width:360px;margin:0 auto;padding:28px 20px calc(env(safe-area-inset-bottom,12px) + 16px);color:#e8e4f0;font-size:14px;line-height:1.5;text-align:center;display:flex;flex-direction:column;justify-content:center;height:100%;box-sizing:border-box;">
+    <img src="icon.png" alt="ChordBloom" style="width:80px;height:80px;border-radius:18px;margin:0 auto 12px;display:block;">
+    <h1 style="margin:0 0 4px;font-size:24px;background:linear-gradient(135deg,#F2506E,#f0c928);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">ChordBloom</h1>
+    <p style="color:#8878a0;margin:0 0 20px;font-size:12px;">Explore harmony visually</p>
 
-    <div style="text-align:left;background:rgba(255,255,255,0.05);border-radius:14px;padding:20px;margin-bottom:24px;">
-      <p style="margin:0 0 14px;"><span style="font-size:18px;">🔊</span> <b>Unmute your phone</b> — flip off silent mode or connect headphones to hear chords</p>
-      <p style="margin:0 0 14px;"><span style="font-size:18px;">👆</span> <b>Tap a chord</b> — play it and make it the new center</p>
-      <p style="margin:0 0 14px;"><span style="font-size:18px;">🎵</span> <b>Try Diatonic mode</b> — swipe the mode bar to explore different chord relationships</p>
-      <p style="margin:0;"><span style="font-size:18px;">❓</span> <b>Need help?</b> — tap the ❓ button anytime</p>
+    <div style="text-align:left;background:rgba(255,255,255,0.05);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <p style="margin:0 0 10px;font-size:13px;"><span style="font-size:16px;">🔊</span> <b>Unmute your phone</b> — flip off silent mode or connect headphones</p>
+      <p style="margin:0 0 10px;font-size:13px;"><span style="font-size:16px;">👆</span> <b>Tap a chord</b> — play it and make it the new center</p>
+      <p style="margin:0 0 10px;font-size:13px;"><span style="font-size:16px;">🎵</span> <b>Try Diatonic mode</b> — swipe the mode bar to explore</p>
+      <p style="margin:0;font-size:13px;"><span style="font-size:16px;">❓</span> <b>Need help?</b> — tap the ❓ button anytime</p>
     </div>
 
-    <div style="margin-bottom:20px;">
-      <label style="font-size:12px;color:#8878a0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;color:#8878a0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
         <input type="checkbox" id="welcomeDontShow" style="accent-color:#F2506E;"> Don't show this again
       </label>
     </div>
 
-    <button onclick="dismissWelcome()" style="background:linear-gradient(135deg,#F2506E,#d63384);color:white;border:none;padding:14px 48px;border-radius:28px;font-size:17px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(242,80,110,0.4);transition:transform 0.15s;">Let's Go!</button>
+    <button onclick="dismissWelcome()" style="background:linear-gradient(135deg,#F2506E,#d63384);color:white;border:none;padding:12px 40px;border-radius:24px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(242,80,110,0.4);">Let's Go!</button>
   </div>
 </div>
 
