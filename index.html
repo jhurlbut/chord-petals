@@ -1774,6 +1774,7 @@ let currentRoot=0;
 let currentMode='diatonic';
 let currentScale='major'; // major, minor, diminished, lydian
 const SCALE_TYPES=['major','minor','diminished','lydian'];
+const SCALE_ROOT_QUALITY={major:'major',minor:'minor',diminished:'dim',lydian:'major'};
 let history_stack=[{root:0,name:'C'}];
 let redoStack=[];
 let selectedPetal=-1;
@@ -1994,8 +1995,8 @@ document.getElementById('center').addEventListener('touchend',(e)=>{
   if(Math.abs(dy)<30){
     // Tap — play chord immediately (don't rely on click event)
     e.preventDefault();e.stopPropagation();
-    playChord(currentRoot,'major');
-    sendMIDIChord(currentRoot,'major');
+    playChord(currentRoot,SCALE_ROOT_QUALITY[currentScale]||'major');
+    sendMIDIChord(currentRoot,SCALE_ROOT_QUALITY[currentScale]||'major');
     const el=document.getElementById('center');
     el.style.transform='translate(-50%,-50%) scale(1.08)';
     setTimeout(()=>el.style.transform='translate(-50%,-50%)',150);
@@ -2027,8 +2028,8 @@ document.getElementById('center').addEventListener('wheel',(e)=>{
 // Center click — play chord only
 document.getElementById('center').addEventListener('click',(e)=>{
   e.stopPropagation();
-  playChord(currentRoot,'major');
-  sendMIDIChord(currentRoot,'major');
+  playChord(currentRoot,SCALE_ROOT_QUALITY[currentScale]||'major');
+  sendMIDIChord(currentRoot,SCALE_ROOT_QUALITY[currentScale]||'major');
   const el=document.getElementById('center');
   el.style.transform='translate(-50%,-50%) scale(1.08)';
   setTimeout(()=>el.style.transform='translate(-50%,-50%)',150);
@@ -2787,7 +2788,7 @@ function toggleVoicePanel(){
   document.getElementById('recordPanel').classList.remove('open');
 }
 function toggleBass(v){bassRoot=v;}
-function previewChord(){playChord(currentRoot,'major');}
+function previewChord(){playChord(currentRoot,SCALE_ROOT_QUALITY[currentScale]||'major');}
 function setSynth(s){
   synthPreset=s;
   // If picking a Sonic Pi preset, force SuperSonic mode; warn if not ready
