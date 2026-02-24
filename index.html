@@ -103,7 +103,8 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:flex-
   will-change:transform;
   touch-action:manipulation;
 }
-.petal.entering{opacity:0;transform:translate(-50%,-50%) scale(0.3)}
+.petal.blooming{opacity:0;transform:translate(var(--center-x) ,var(--center-y)) scale(0)!important;transition:none!important}
+.petal.bloom-go{opacity:1;transform:translate(var(--target-x),var(--target-y)) scale(1)!important;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s ease!important}
 .petal .petal-label{
   font-size:12px;font-weight:700;color:#fff;text-shadow:none;
   pointer-events:none;text-align:center;line-height:1.1;
@@ -1806,6 +1807,7 @@ var dbgOverlap=0.24;      // petal overlap (0=none, 1=full)
 var dbgRingOffset=0.5;    // angle offset per ring (fraction of petal angle step)
 var dbgVertCenter=0.38;   // vertical center position (0-1)
 let petalElements=[];
+let _lastChordKey='',_lastChordCount=0;
 let petalCustomOffsets={}; // index -> {dx,dy} for dragged petals
 let petalVoicings={}; // index -> 0-3 (ring level: triad, 7th, 9th, 11th)
 let subPetals=[]; // array of {parentIdx, voiceLevel} — voiceLevel: 1=7th, 2=9th, 3=11th
@@ -2165,6 +2167,18 @@ function render(){
   const petalScale=(chords.length>7?Math.max(0.6,1-(chords.length-7)*0.04):1)*dbgPetalScale;
   const pDiam=Math.round(petalR*2*petalScale);
 
+  // Detect chord set change → trigger bloom (full vs partial)
+  const chordKey=chords.map(c=>c.root+c.quality).join(',');
+  const prevKey=_lastChordKey;
+  const prevCount=_lastChordCount||0;
+  _lastChordKey=chordKey;
+  _lastChordCount=chords.length;
+  // Full bloom: existing chords changed (key change, mode switch)
+  // Partial bloom: new chords appended (petal count increased, same base chords)
+  const isExtension=prevKey!==''&&chordKey.startsWith(prevKey)&&chords.length>prevCount;
+  const fullBloom=(prevKey===''&&chords.length>0)||(prevKey!==''&&chordKey!==prevKey&&!isExtension);
+  const partialBloom=isExtension;
+
   chords.forEach((ch,i)=>{
     const pp=packPositions[i]||{x:0,y:0};
     const custom=petalCustomOffsets[i];
@@ -2174,8 +2188,28 @@ function render(){
     const voiceLevel=petalVoicings[i]||0;
 
     const el=petalElements[i];
-    // Use transform for GPU-accelerated positioning
-    el.style.transform=`translate(${px-pDiam/2}px,${py-pDiam/2}px)`;
+
+    const isNew=partialBloom&&i>=prevCount;
+    if(fullBloom||isNew){
+      // Start at center, scale 0
+      el.style.setProperty('--center-x',(cx-pDiam/2)+'px');
+      el.style.setProperty('--center-y',(cy-pDiam/2)+'px');
+      el.style.setProperty('--target-x',(px-pDiam/2)+'px');
+      el.style.setProperty('--target-y',(py-pDiam/2)+'px');
+      el.classList.remove('bloom-go');
+      el.classList.add('blooming');
+      const delay=fullBloom?i*100:0;
+      setTimeout(()=>{
+        el.classList.remove('blooming');
+        el.classList.add('bloom-go');
+        setTimeout(()=>{
+          el.classList.remove('bloom-go');
+          el.style.transform=`translate(${px-pDiam/2}px,${py-pDiam/2}px)`;
+        },450);
+      },delay);
+    } else {
+      el.style.transform=`translate(${px-pDiam/2}px,${py-pDiam/2}px)`;
+    }
     el.style.width=pDiam+'px';el.style.height=pDiam+'px';
     el.style.left='0';el.style.top='0';
     el.style.background=qi.solid;
