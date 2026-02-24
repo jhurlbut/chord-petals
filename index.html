@@ -2177,7 +2177,8 @@ function render(){
   // Full bloom: existing chords changed (key change, mode switch)
   // Partial bloom: new chords appended (petal count increased, same base chords)
   const isExtension=prevKey!==''&&chordKey.startsWith(prevKey)&&chords.length>prevCount;
-  const fullBloom=(prevKey===''&&chords.length>0)||(prevKey!==''&&chordKey!==prevKey&&!isExtension);
+  const isShrink=prevKey!==''&&prevKey.startsWith(chordKey)&&chords.length<prevCount;
+  const fullBloom=(prevKey===''&&chords.length>0)||(prevKey!==''&&chordKey!==prevKey&&!isExtension&&!isShrink);
   const partialBloom=isExtension;
 
   chords.forEach((ch,i)=>{
