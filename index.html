@@ -2841,7 +2841,7 @@ function setSynth(s){
   previewChord();
 }
 function shiftOctave(dir){
-  octaveShift=Math.max(-2,Math.min(2,octaveShift+dir));
+  octaveShift=Math.max(-4,Math.min(4,octaveShift+dir));
   window.octaveShift=octaveShift;
   document.getElementById('octaveLabel').textContent=(octaveShift>0?'+':'')+octaveShift;
   var od=document.getElementById('octaveDisplay');if(od)od.textContent='Oct '+(octaveShift>0?'+':'')+octaveShift;
